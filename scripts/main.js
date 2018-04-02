@@ -3095,7 +3095,7 @@ define("main", ["require", "exports", "lib/clipboard", "gui"], function (require
     "use strict";
     var _this = this;
     Object.defineProperty(exports, "__esModule", { value: true });
-    window.onload = function () {
+    $(document).ready(function () {
         $('.tabs').tabs();
         $('.tooltipped').tooltip();
         var clip = new clipboard_1.Clipboard("canvas", true);
@@ -3134,5 +3134,5 @@ define("main", ["require", "exports", "lib/clipboard", "gui"], function (require
         $("#lnkTrivial").click(function () { gui_2.loadExample("imgTrivial"); return false; });
         $("#lnkSmall").click(function () { gui_2.loadExample("imgSmall"); return false; });
         $("#lnkMedium").click(function () { gui_2.loadExample("imgMedium"); return false; });
-    };
+    });
 });

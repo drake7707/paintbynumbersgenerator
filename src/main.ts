@@ -3,7 +3,7 @@ import { loadExample, process, updateOutput, downloadSVG, downloadPNG, downloadP
 import { rgbToHsl, hslToRgb } from "./lib/colorconversion";
 import { RGB } from "./common";
 
-window.onload = () => {
+$(document).ready(() => {
 
     $('.tabs').tabs();
     $('.tooltipped').tooltip();
@@ -35,4 +35,4 @@ window.onload = () => {
     $("#lnkTrivial").click(() => { loadExample("imgTrivial"); return false; });
     $("#lnkSmall").click(() => { loadExample("imgSmall"); return false; });
     $("#lnkMedium").click(() => { loadExample("imgMedium"); return false; });
-};
+});
