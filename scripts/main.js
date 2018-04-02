@@ -2863,6 +2863,53 @@ define("gui", ["require", "exports", "common", "guiprocessmanager", "settings"],
         }
         return $(html);
     }
+    function downloadPalettePng() {
+        if (processResult == null)
+            return;
+        var colorsByIndex = processResult.colorsByIndex;
+        var canvas = document.createElement("canvas");
+        var nrOfItemsPerRow = 10;
+        var nrRows = Math.ceil(colorsByIndex.length / nrOfItemsPerRow);
+        var margin = 10;
+        var cellWidth = 80;
+        var cellHeight = 70;
+        canvas.width = margin + nrOfItemsPerRow * (cellWidth + margin);
+        canvas.height = margin + nrRows * (cellHeight + margin);
+        var ctx = canvas.getContext("2d");
+        ctx.translate(0.5, 0.5);
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        for (var i = 0; i < colorsByIndex.length; i++) {
+            var color = colorsByIndex[i];
+            var x = margin + (i % nrOfItemsPerRow) * (cellWidth + margin);
+            var y = margin + Math.floor(i / nrOfItemsPerRow) * (cellHeight + margin);
+            ctx.fillStyle = "rgb(" + color[0] + ", " + color[1] + ", " + color[2] + ")";
+            ctx.fillRect(x, y, cellWidth, cellHeight - 20);
+            ctx.strokeStyle = "#888";
+            ctx.strokeRect(x, y, cellWidth, cellHeight - 20);
+            var nrText = i + "";
+            ctx.fillStyle = "black";
+            ctx.strokeStyle = "#CCC";
+            ctx.font = "20px Tahoma";
+            var nrTextSize = ctx.measureText(nrText);
+            ctx.lineWidth = 2;
+            ctx.strokeText(nrText, x + cellWidth / 2 - nrTextSize.width / 2, y + cellHeight / 2 - 5);
+            ctx.fillText(nrText, x + cellWidth / 2 - nrTextSize.width / 2, y + cellHeight / 2 - 5);
+            ctx.lineWidth = 1;
+            ctx.font = "10px Tahoma";
+            var rgbText = "RGB: " + Math.floor(color[0]) + "," + Math.floor(color[1]) + "," + Math.floor(color[2]);
+            var rgbTextSize = ctx.measureText(rgbText);
+            ctx.fillStyle = "black";
+            ctx.fillText(rgbText, x + cellWidth / 2 - rgbTextSize.width / 2, y + cellHeight - 10);
+        }
+        var dataURL = canvas.toDataURL("image/png");
+        var dl = document.createElement("a");
+        document.body.appendChild(dl);
+        dl.setAttribute("href", dataURL);
+        dl.setAttribute("download", "palette.png");
+        dl.click();
+    }
+    exports.downloadPalettePng = downloadPalettePng;
     function downloadPNG() {
         if ($("#svgContainer svg").length > 0) {
             var svg = $("#svgContainer svg").get(0);
@@ -3080,6 +3127,9 @@ define("main", ["require", "exports", "lib/clipboard", "gui"], function (require
         });
         $("#btnDownloadPNG").click(function () {
             gui_2.downloadPNG();
+        });
+        $("#btnDownloadPalettePNG").click(function () {
+            gui_2.downloadPalettePng();
         });
         $("#lnkTrivial").click(function () { gui_2.loadExample("imgTrivial"); return false; });
         $("#lnkSmall").click(function () { gui_2.loadExample("imgSmall"); return false; });

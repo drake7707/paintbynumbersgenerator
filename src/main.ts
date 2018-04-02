@@ -1,5 +1,7 @@
 import { Clipboard } from "./lib/clipboard";
-import { loadExample, process, updateOutput, downloadSVG, downloadPNG } from "./gui";
+import { loadExample, process, updateOutput, downloadSVG, downloadPNG, downloadPalettePng } from "./gui";
+import { rgbToHsl, hslToRgb } from "./lib/colorconversion";
+import { RGB } from "./common";
 
 window.onload = () => {
 
@@ -24,6 +26,10 @@ window.onload = () => {
 
     $("#btnDownloadPNG").click(function () {
         downloadPNG();
+    });
+
+    $("#btnDownloadPalettePNG").click(function () {
+        downloadPalettePng();
     });
 
     $("#lnkTrivial").click(() => { loadExample("imgTrivial"); return false; });

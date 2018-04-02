@@ -113,6 +113,63 @@ function createPaletteHtml(colorsByIndex: RGB[]) {
     return $(html);
 }
 
+export function downloadPalettePng() {
+    if(processResult == null) return;
+    let colorsByIndex: RGB[] = processResult.colorsByIndex;
+
+    let canvas = document.createElement("canvas");
+
+    let nrOfItemsPerRow = 10;
+    let nrRows = Math.ceil(colorsByIndex.length / nrOfItemsPerRow);
+    let margin = 10;
+    let cellWidth = 80;
+    let cellHeight = 70;
+
+    canvas.width = margin + nrOfItemsPerRow * (cellWidth + margin);
+    canvas.height = margin + nrRows * (cellHeight + margin);
+    let ctx = canvas.getContext("2d")!;
+    ctx.translate(0.5,0.5);
+
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for (let i = 0; i < colorsByIndex.length; i++) {
+        let color = colorsByIndex[i];
+
+        let x = margin + (i % nrOfItemsPerRow) * (cellWidth + margin);
+        let y = margin + Math.floor(i / nrOfItemsPerRow) * (cellHeight + margin);
+
+        ctx.fillStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+        ctx.fillRect(x, y, cellWidth, cellHeight - 20);
+        ctx.strokeStyle = "#888";
+        ctx.strokeRect(x, y, cellWidth, cellHeight - 20);
+
+        let nrText = i + "";
+        ctx.fillStyle = "black";
+        ctx.strokeStyle = "#CCC";
+        ctx.font = "20px Tahoma";
+        let nrTextSize = ctx.measureText(nrText);
+        ctx.lineWidth = 2;
+        ctx.strokeText(nrText, x + cellWidth / 2 - nrTextSize.width / 2, y + cellHeight /2 - 5);
+        ctx.fillText(nrText, x + cellWidth / 2 - nrTextSize.width / 2, y + cellHeight /2 - 5);
+        ctx.lineWidth = 1;
+
+
+        ctx.font = "10px Tahoma";
+        let rgbText = "RGB: " + Math.floor(color[0]) + "," + Math.floor(color[1]) + "," + Math.floor(color[2]);
+        let rgbTextSize = ctx.measureText(rgbText);
+        ctx.fillStyle = "black";
+        ctx.fillText(rgbText, x + cellWidth / 2 - rgbTextSize.width / 2, y + cellHeight - 10);
+    }
+
+    let dataURL = canvas.toDataURL("image/png");
+    var dl = document.createElement("a");
+    document.body.appendChild(dl);
+    dl.setAttribute("href", dataURL);
+    dl.setAttribute("download", "palette.png");
+    dl.click();
+}
+
+
 export function downloadPNG() {
     if ($("#svgContainer svg").length > 0) {
         let svg = <any>$("#svgContainer svg").get(0);
