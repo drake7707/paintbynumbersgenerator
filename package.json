@@ -1,13 +1,17 @@
 {
-   "name": "paint-by-numbers-generator",
-   "version": "1.0.0",
-   "description": "Paint by numbers generator",
-   "scripts": {
-     "lite": "lite-server --port 10001",
-     "start": "npm run lite"
-   },
-   "author": "drake7707",
-   "devDependencies": {
-     "lite-server": "^1.3.1"
-   }
+  "name": "paint-by-numbers-generator",
+  "version": "1.0.0",
+  "description": "Paint by numbers generator",
+  "scripts": {
+    "lite": "lite-server --port 10001",
+    "start": "npm run lite"
+  },
+  "author": "drake7707",
+  "devDependencies": {
+    "lite-server": "^1.3.1"
+  },
+  "dependencies": {
+    "@types/jquery": "^3.3.29",
+    "@types/materialize-css": "^1.0.6"
+  }
 }

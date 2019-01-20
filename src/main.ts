@@ -3,7 +3,7 @@ import { loadExample, process, updateOutput, downloadSVG, downloadPNG, downloadP
 import { rgbToHsl, hslToRgb } from "./lib/colorconversion";
 import { RGB } from "./common";
 
-$(document).ready(() => {
+$(document).ready(function() {
 
     $('.tabs').tabs();
     $('.tooltipped').tooltip();

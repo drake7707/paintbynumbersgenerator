@@ -13,8 +13,8 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     function step(op) {
         if (f) throw new TypeError("Generator is already executing.");
         while (_) try {
-            if (f = 1, y && (t = y[op[0] & 2 ? "return" : op[0] ? "throw" : "next"]) && !(t = t.call(y, op[1])).done) return t;
-            if (y = 0, t) op = [0, t.value];
+            if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
+            if (y = 0, t) op = [op[0] & 2, t.value];
             switch (op[0]) {
                 case 0: case 1: t = op; break;
                 case 4: _.label++; return { value: op[1], done: false };
@@ -34,9 +34,12 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 var __extends = (this && this.__extends) || (function () {
-    var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    var extendStatics = function (d, b) {
+        extendStatics = Object.setPrototypeOf ||
+            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+            function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+        return extendStatics(d, b);
+    }
     return function (d, b) {
         extendStatics(d, b);
         function __() { this.constructor = d; }
@@ -2920,13 +2923,27 @@ define("gui", ["require", "exports", "common", "guiprocessmanager", "settings"],
     exports.downloadPNG = downloadPNG;
     function downloadSVG() {
         if ($("#svgContainer svg").length > 0) {
-            var svgAsXML = (new XMLSerializer).serializeToString($("#svgContainer svg").get(0));
-            var dataURL = "data:image/svg+xml," + encodeURIComponent(svgAsXML);
+            var svgEl = $("#svgContainer svg").get(0);
+            svgEl.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+            var svgData = svgEl.outerHTML;
+            var preface = '<?xml version="1.0" standalone="no"?>\r\n';
+            var svgBlob = new Blob([preface, svgData], { type: "image/svg+xml;charset=utf-8" });
+            var svgUrl = URL.createObjectURL(svgBlob);
+            var downloadLink = document.createElement("a");
+            downloadLink.href = svgUrl;
+            downloadLink.download = "paintbynumbers.svg";
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+            /*
+            var svgAsXML = (new XMLSerializer).serializeToString(<any>$("#svgContainer svg").get(0));
+            let dataURL = "data:image/svg+xml," + encodeURIComponent(svgAsXML);
             var dl = document.createElement("a");
             document.body.appendChild(dl);
             dl.setAttribute("href", dataURL);
             dl.setAttribute("download", "paintbynumbers.svg");
             dl.click();
+            */
         }
     }
     exports.downloadSVG = downloadSVG;
@@ -3093,9 +3110,9 @@ define("lib/clipboard", ["require", "exports"], function (require, exports) {
 });
 define("main", ["require", "exports", "lib/clipboard", "gui"], function (require, exports, clipboard_1, gui_2) {
     "use strict";
-    var _this = this;
     Object.defineProperty(exports, "__esModule", { value: true });
     $(document).ready(function () {
+        var _this = this;
         $('.tabs').tabs();
         $('.tooltipped').tooltip();
         var clip = new clipboard_1.Clipboard("canvas", true);

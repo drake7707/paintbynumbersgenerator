@@ -7,6 +7,7 @@ import { ProcessResult, GUIProcessManager } from "./guiprocessmanager";
 import { ClusteringColorSpace, Settings } from "./settings";
 
 
+
 declare function saveSvgAsPng(el: Node, filename: string): void;
 
 let processResult: ProcessResult | null = null;
@@ -98,7 +99,7 @@ export async function updateOutput() {
         });
         $("#svgContainer").empty().append(svg);
         $("#palette").empty().append(createPaletteHtml(processResult.colorsByIndex));
-        $('#palette .color').tooltip();
+        (<any>$('#palette .color')).tooltip();
         $(".status").removeClass("active");
         $(".status.SVGGenerate").addClass("complete");
     }
@@ -180,6 +181,21 @@ export function downloadPNG() {
 
 export function downloadSVG() {
     if ($("#svgContainer svg").length > 0) {
+        let svgEl = <any>$("#svgContainer svg").get(0);
+
+        svgEl.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+        var svgData = svgEl.outerHTML;
+        var preface = '<?xml version="1.0" standalone="no"?>\r\n';
+        var svgBlob = new Blob([preface, svgData], {type:"image/svg+xml;charset=utf-8"});
+        var svgUrl = URL.createObjectURL(svgBlob);
+        var downloadLink = document.createElement("a");
+        downloadLink.href = svgUrl;
+        downloadLink.download = "paintbynumbers.svg";
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+
+        /*
         var svgAsXML = (new XMLSerializer).serializeToString(<any>$("#svgContainer svg").get(0));
         let dataURL = "data:image/svg+xml," + encodeURIComponent(svgAsXML);
         var dl = document.createElement("a");
@@ -187,6 +203,7 @@ export function downloadSVG() {
         dl.setAttribute("href", dataURL);
         dl.setAttribute("download", "paintbynumbers.svg");
         dl.click();
+        */
     }
 }
 
