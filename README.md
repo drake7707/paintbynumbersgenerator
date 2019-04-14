@@ -23,3 +23,11 @@ Try it out [here](https://drake7707.github.io/paintbynumbersgenerator/index.html
 I used VSCode, which has built in typescript support. To debug it uses a tiny webserver to host the files on localhost. 
 
 To run do `npm install` to restore packages and then `npm start` to start the webserver
+
+## Running in Docker
+
+`docker-compose build`
+
+`docker-compose up`
+
+navigate your web browser to 127.0.0.1
