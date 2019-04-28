@@ -3,7 +3,7 @@ import { loadExample, process, updateOutput, downloadSVG, downloadPNG, downloadP
 import { rgbToHsl, hslToRgb } from "./lib/colorconversion";
 import { RGB } from "./common";
 
-$(document).ready(function() {
+$(document).ready(function () {
 
     $('.tabs').tabs();
     $('.tooltipped').tooltip();
@@ -13,7 +13,12 @@ $(document).ready(function() {
     loadExample("imgSmall");
 
     $("#btnProcess").click(async function () {
-        await process();
+        try {
+            await process();
+        }
+        catch (err) {
+            alert("Error: " + err);
+        }
     });
 
     $("#chkShowLabels, #chkFillFacets, #chkShowBorders, #txtSizeMultiplier, #txtLabelFontSize").change(async () => {

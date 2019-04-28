@@ -6,6 +6,7 @@ import { BoundingBox } from "./structs/boundingbox";
 import { BooleanArray2D, Uint32Array2D, Uint8Array2D } from "./structs/typedarrays";
 import { IMap, RGB, delay } from "./common";
 import { pointToPolygonDist, polylabel } from "./lib/polylabel";
+import { fill } from "./lib/fill";
 
 enum OrientationEnum {
     Left,
@@ -216,19 +217,9 @@ export class FacetCreator {
         facet.bbox = new BoundingBox();
         facet.borderPoints = [];
 
-        // using a 1D flattened stack (x*width+y), we can avoid heap allocations of Point objects, which halves the garbage collection time
-        let stack: number[] = [];
-        stack.push(y * facetResult.width + x);
-
-        while (stack.length > 0) {
-            let pt = stack.pop()!;
-            let ptx = pt % facetResult.width;
-            let pty = Math.floor(pt / facetResult.width);
-
-            // if the point wasn't visited before and matches 
-            // the same color
-            if (!visited.get(ptx, pty) &&
-                imgColorIndices.get(ptx, pty) == facetColorIndex) {
+        fill(x, y, facetResult.width, facetResult.height,
+            (ptx, pty) => visited.get(ptx, pty) || imgColorIndices.get(ptx, pty) != facetColorIndex,
+            (ptx, pty) => {
 
                 visited.set(ptx, pty, true);
                 facetResult.facetMap.set(ptx, pty, facetIndex);
@@ -248,18 +239,54 @@ export class FacetCreator {
                 if (pty > facet.bbox.maxY) facet.bbox.maxY = pty;
                 if (ptx < facet.bbox.minX) facet.bbox.minX = ptx;
                 if (pty < facet.bbox.minY) facet.bbox.minY = pty;
+            });
 
-                // visit direct adjacent points
-                if (ptx - 1 >= 0 && !visited.get(ptx - 1, pty))
-                    stack.push(pty * facetResult.width + (ptx - 1)); //stack.push(new Point(pt.x - 1, pt.y));
-                if (pty - 1 >= 0 && !visited.get(ptx, pty - 1))
-                    stack.push((pty - 1) * facetResult.width + ptx); //stack.push(new Point(pt.x, pt.y - 1));
-                if (ptx + 1 < facetResult.width && !visited.get(ptx + 1, pty))
-                    stack.push(pty * facetResult.width + (ptx + 1));//stack.push(new Point(pt.x + 1, pt.y));
-                if (pty + 1 < facetResult.height && !visited.get(ptx, pty + 1))
-                    stack.push((pty + 1) * facetResult.width + ptx); //stack.push(new Point(pt.x, pt.y + 1));
-            }
-        }
+        /* 
+           // using a 1D flattened stack (x*width+y), we can avoid heap allocations of Point objects, which halves the garbage collection time
+         let stack: number[] = [];
+         stack.push(y * facetResult.width + x);
+ 
+         while (stack.length > 0) {
+             let pt = stack.pop()!;
+             let ptx = pt % facetResult.width;
+             let pty = Math.floor(pt / facetResult.width);
+ 
+             // if the point wasn't visited before and matches 
+             // the same color
+             if (!visited.get(ptx, pty) &&
+                 imgColorIndices.get(ptx, pty) == facetColorIndex) {
+ 
+                 visited.set(ptx, pty, true);
+                 facetResult.facetMap.set(ptx, pty, facetIndex);
+                 facet.pointCount++;
+ 
+                 // determine if the point is a border or not
+                 let isInnerPoint = (ptx - 1 >= 0 && imgColorIndices.get(ptx - 1, pty) == facetColorIndex) &&
+                     (pty - 1 >= 0 && imgColorIndices.get(ptx, pty - 1) == facetColorIndex) &&
+                     (ptx + 1 < facetResult.width && imgColorIndices.get(ptx + 1, pty) == facetColorIndex) &&
+                     (pty + 1 < facetResult.height && imgColorIndices.get(ptx, pty + 1) == facetColorIndex);
+ 
+                 if (!isInnerPoint)
+                     facet.borderPoints.push(new Point(ptx, pty));
+ 
+                 // update bounding box of facet
+                 if (ptx > facet.bbox.maxX) facet.bbox.maxX = ptx;
+                 if (pty > facet.bbox.maxY) facet.bbox.maxY = pty;
+                 if (ptx < facet.bbox.minX) facet.bbox.minX = ptx;
+                 if (pty < facet.bbox.minY) facet.bbox.minY = pty;
+ 
+                 // visit direct adjacent points
+                 if (ptx - 1 >= 0 && !visited.get(ptx - 1, pty))
+                     stack.push(pty * facetResult.width + (ptx - 1)); //stack.push(new Point(pt.x - 1, pt.y));
+                 if (pty - 1 >= 0 && !visited.get(ptx, pty - 1))
+                     stack.push((pty - 1) * facetResult.width + ptx); //stack.push(new Point(pt.x, pt.y - 1));
+                 if (ptx + 1 < facetResult.width && !visited.get(ptx + 1, pty))
+                     stack.push(pty * facetResult.width + (ptx + 1));//stack.push(new Point(pt.x + 1, pt.y));
+                 if (pty + 1 < facetResult.height && !visited.get(ptx, pty + 1))
+                     stack.push((pty + 1) * facetResult.width + ptx); //stack.push(new Point(pt.x, pt.y + 1));
+             }
+         }
+         */
         return facet;
     }
 
@@ -318,6 +345,9 @@ export class FacetReducer {
         if (!removeFacetsFromLargeToSmall)
             facetProcessingOrder.reverse();
 
+
+        let curTime = new Date().getTime();
+
         for (let fidx: number = 0; fidx < facetProcessingOrder.length; fidx++) {
             let f = facetResult.facets[facetProcessingOrder[fidx]];
             // facets can be removed by merging by others due to a previous facet deletion
@@ -325,8 +355,9 @@ export class FacetReducer {
                 let facetToRemove = f;
                 FacetReducer.deleteFacet(facetToRemove!, facetResult, imgColorIndices, colorDistances, visitedCache);
 
-                if (count % 10 == 0) await delay(0);
-                if (count % 100 == 0) {
+                if (new Date().getTime() - curTime > 500) {
+                    curTime = new Date().getTime();
+                    await delay(0);
                     if (onUpdate != null)
                         onUpdate(fidx / facetProcessingOrder.length);
                 }
@@ -416,16 +447,16 @@ export class FacetReducer {
                     console.warn(`Point ${x},${y} was reallocated to neighbours for facet ${facetToRemove.id} deletion`);
                     needsToRebuild = true;
 
-                    if (x - 1 >= 0 && facetResult.facetMap.get(x - 1, y) != facetToRemove.id) {
+                    if (x - 1 >= 0 && facetResult.facetMap.get(x - 1, y) != facetToRemove.id && facetResult.facets[facetResult.facetMap.get(x - 1, y)] !== null) {
                         imgColorIndices.set(x, y, facetResult.facets[facetResult.facetMap.get(x - 1, y)]!.color);
                     }
-                    else if (y - 1 >= 0 && facetResult.facetMap.get(x, y - 1) != facetToRemove.id) {
+                    else if (y - 1 >= 0 && facetResult.facetMap.get(x, y - 1) != facetToRemove.id && facetResult.facets[facetResult.facetMap.get(x, y - 1)] !== null) {
                         imgColorIndices.set(x, y, facetResult.facets[facetResult.facetMap.get(x, y - 1)]!.color);
                     }
-                    else if (x + 1 < facetResult.width && facetResult.facetMap.get(x + 1, y) != facetToRemove.id) {
+                    else if (x + 1 < facetResult.width && facetResult.facetMap.get(x + 1, y) != facetToRemove.id && facetResult.facets[facetResult.facetMap.get(x + 1, y)] !== null ) {
                         imgColorIndices.set(x, y, facetResult.facets[facetResult.facetMap.get(x + 1, y)]!.color);
                     }
-                    else if (y + 1 < facetResult.height && facetResult.facetMap.get(x, y + 1) != facetToRemove.id) {
+                    else if (y + 1 < facetResult.height && facetResult.facetMap.get(x, y + 1) != facetToRemove.id && facetResult.facets[facetResult.facetMap.get(x, y + 1)] !== null) {
                         imgColorIndices.set(x, y, facetResult.facets[facetResult.facetMap.get(x, y + 1)]!.color);
                     }
                     else
