@@ -62,6 +62,8 @@ export class ColorReducer {
         let idx = 0;
         let vIdx = 0;
 
+        const bitsToChopOff = 2; // r,g,b gets rounded to every 4 values, 0,4,8,...
+
         // group by color, add points as 1D index to prevent Point object allocation
         let pointsByColor: IMap<number[]> = {};
         for (let j: number = 0; j < imgData.height; j++) {
@@ -70,6 +72,13 @@ export class ColorReducer {
                 let g = imgData.data[idx++];
                 let b = imgData.data[idx++];
                 let a = imgData.data[idx++];
+
+                // small performance boost: reduce bitness of colors by chopping off the last bits
+                // this will group more colors with only slight variation in color together, reducing the size of the points
+                
+                r = r >> bitsToChopOff << bitsToChopOff;
+                g = g >> bitsToChopOff << bitsToChopOff;
+                b = b >> bitsToChopOff << bitsToChopOff;
 
                 let color = `${r},${g},${b}`;
                 if (!(color in pointsByColor)) {
