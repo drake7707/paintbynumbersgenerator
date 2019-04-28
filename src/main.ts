@@ -1,22 +1,19 @@
+import { downloadPalettePng, downloadPNG, downloadSVG, loadExample, process, updateOutput } from "./gui";
 import { Clipboard } from "./lib/clipboard";
-import { loadExample, process, updateOutput, downloadSVG, downloadPNG, downloadPalettePng } from "./gui";
-import { rgbToHsl, hslToRgb } from "./lib/colorconversion";
-import { RGB } from "./common";
 
-$(document).ready(function () {
+$(document).ready(function() {
 
-    $('.tabs').tabs();
-    $('.tooltipped').tooltip();
+    $(".tabs").tabs();
+    $(".tooltipped").tooltip();
 
-    var clip = new Clipboard("canvas", true);
+    const clip = new Clipboard("canvas", true);
 
     loadExample("imgSmall");
 
-    $("#btnProcess").click(async function () {
+    $("#btnProcess").click(async function() {
         try {
             await process();
-        }
-        catch (err) {
+        } catch (err) {
             alert("Error: " + err);
         }
     });
@@ -25,15 +22,15 @@ $(document).ready(function () {
         await updateOutput();
     });
 
-    $("#btnDownloadSVG").click(function () {
+    $("#btnDownloadSVG").click(function() {
         downloadSVG();
     });
 
-    $("#btnDownloadPNG").click(function () {
+    $("#btnDownloadPNG").click(function() {
         downloadPNG();
     });
 
-    $("#btnDownloadPalettePNG").click(function () {
+    $("#btnDownloadPalettePNG").click(function() {
         downloadPalettePng();
     });
 

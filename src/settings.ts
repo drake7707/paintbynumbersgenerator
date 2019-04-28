@@ -2,18 +2,18 @@
 export enum ClusteringColorSpace {
     RGB = 0,
     HSL = 1,
-    LAB = 2
+    LAB = 2,
 }
 
 export class Settings {
-    kMeansNrOfClusters: number = 16;
-    kMeansMinDeltaDifference: number = 1;
-    kMeansClusteringColorSpace: ClusteringColorSpace = ClusteringColorSpace.RGB;
-    removeFacetsSmallerThanNrOfPoints: number = 20;
-    removeFacetsFromLargeToSmall: boolean = true;
-    nrOfTimesToHalveBorderSegments: number = 2;
+    public kMeansNrOfClusters: number = 16;
+    public kMeansMinDeltaDifference: number = 1;
+    public kMeansClusteringColorSpace: ClusteringColorSpace = ClusteringColorSpace.RGB;
+    public removeFacetsSmallerThanNrOfPoints: number = 20;
+    public removeFacetsFromLargeToSmall: boolean = true;
+    public nrOfTimesToHalveBorderSegments: number = 2;
 
-    resizeImageIfTooLarge: boolean = true;
-    resizeImageWidth: number = 1024;
-    resizeImageHeight: number = 1024;
+    public resizeImageIfTooLarge: boolean = true;
+    public resizeImageWidth: number = 1024;
+    public resizeImageHeight: number = 1024;
 }

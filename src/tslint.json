@@ -1,3 +1,14 @@
 {
-    "defaultSeverity": "warning"
+    "extends": "tslint:recommended",
+    "rulesDirectory": [],
+    "rules": {
+       "max-classes-per-file":false,
+       "max-line-length":false,
+       "no-console":false,
+       "no-bitwise":false,
+       "member-ordering":false
+    },
+    "jsRules": {
+       
+    }
 }

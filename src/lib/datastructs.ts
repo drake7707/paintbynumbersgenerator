@@ -22,20 +22,22 @@ export class Map<TValue> {
     }
 
     public getKeys(): string[] {
-        let keys: string[] = [];
-        for (let el in this.obj) {
-            if (this.obj.hasOwnProperty(el))
+        const keys: string[] = [];
+        for (const el in this.obj) {
+            if (this.obj.hasOwnProperty(el)) {
                 keys.push(el);
+            }
         }
         return keys;
     }
 
     public get(key: string): TValue | null {
-        let o = this.obj[key];
-        if (typeof o === "undefined")
+        const o = this.obj[key];
+        if (typeof o === "undefined") {
             return null;
-        else
-            return <TValue>o;
+        } else {
+            return o as TValue;
+        }
     }
 
     public put(key: string, value: TValue): void {
@@ -46,10 +48,10 @@ export class Map<TValue> {
         delete this.obj[key];
     }
 
-    clone(): Map<TValue> {
-        let m = new Map<TValue>();
+    public clone(): Map<TValue> {
+        const m = new Map<TValue>();
         m.obj = {};
-        for (let p in this.obj) {
+        for (const p in this.obj) {
             m.obj[p] = this.obj[p];
         }
         return m;
@@ -87,24 +89,25 @@ class Heap<T extends IHeapItem> {
     }
 
     public remove(obj: T): void {
-        let idx = this.keyMap.get(obj.getKey());
+        const idx = this.keyMap.get(obj.getKey());
 
-        if (idx == -1)
+        if (idx === -1) {
             return;
+        }
         this.removeAt(idx!);
     }
 
     public removeWhere(predicate: (el: T) => boolean) {
-        let itemsToRemove: T[] = [];
+        const itemsToRemove: T[] = [];
         for (let i: number = this.array.length - 1; i >= 0; i--) {
             if (predicate(this.array[i])) {
                 itemsToRemove.push(this.array[i]);
             }
         }
-        for (let el of itemsToRemove) {
+        for (const el of itemsToRemove) {
             this.remove(el);
         }
-        for (let el of this.array) {
+        for (const el of this.array) {
             if (predicate(el)) {
                 console.log("Idx of element not removed: " + this.keyMap.get(el.getKey()));
                 throw new Error("element not removed: " + el.getKey());
@@ -113,24 +116,24 @@ class Heap<T extends IHeapItem> {
     }
 
     private removeAt(idx: number): T {
-        let obj: any = this.array[idx];
+        const obj: any = this.array[idx];
         this.keyMap.remove(obj.getKey());
-        let isLastElement: boolean = idx == this.array.length - 1;
+        const isLastElement: boolean = idx === this.array.length - 1;
         if (this.array.length > 0) {
-            let newobj: any = this.array.pop();
-            if (!isLastElement && this.array.length > 0)
+            const newobj: any = this.array.pop();
+            if (!isLastElement && this.array.length > 0) {
                 this.replaceAt(idx, newobj);
+            }
         }
         return obj;
     }
 
     public foreach(func: (el: T) => void) {
-        let arr = this.array.sort((e, e2) => e.compareTo(e2));
-        for (let el of arr) {
+        const arr = this.array.sort((e, e2) => e.compareTo(e2));
+        for (const el of arr) {
             func(el);
         }
     }
-
 
     public peek(): T {
         return this.array[0];
@@ -141,11 +144,12 @@ class Heap<T extends IHeapItem> {
     }
 
     public at(key: string): T | null {
-        let obj = this.keyMap.get(key);
-        if (typeof obj === "undefined")
+        const obj = this.keyMap.get(key);
+        if (typeof obj === "undefined") {
             return null;
-        else
-            return this.array[<number>obj];
+        } else {
+            return this.array[obj as number];
+        }
     }
 
     public size(): number {
@@ -153,7 +157,7 @@ class Heap<T extends IHeapItem> {
     }
 
     public checkHeapRequirement(item: T) {
-        let idx = <number>this.keyMap.get(item.getKey());
+        const idx = this.keyMap.get(item.getKey()) as number;
         if (idx != null) {
             this.checkParentRequirement(idx);
             this.checkChildrenRequirement(idx);
@@ -163,26 +167,29 @@ class Heap<T extends IHeapItem> {
     private checkChildrenRequirement(idx: number): void {
         let stop: boolean = false;
         while (!stop) {
-            let left: number = this.getLeftChildIndex(idx);
-            let right: number = left == -1 ? -1 : left + 1;
+            const left: number = this.getLeftChildIndex(idx);
+            let right: number = left === -1 ? -1 : left + 1;
 
-            if (left == -1)
+            if (left === -1) {
                 return;
-            if (right >= this.size())
+            }
+            if (right >= this.size()) {
                 right = -1;
+            }
 
             let minIdx: number;
-            if (right == -1)
+            if (right === -1) {
                 minIdx = left;
-            else
+            } else {
                 minIdx = (this.array[left].compareTo(this.array[right]) < 0) ? left : right;
+            }
 
             if (this.array[idx].compareTo(this.array[minIdx]) > 0) {
                 this.swap(idx, minIdx);
                 idx = minIdx; // iteratively instead of recursion for this.checkChildrenRequirement(minIdx);
-            }
-            else
+            } else {
                 stop = true;
+            }
         }
     }
 
@@ -198,12 +205,13 @@ class Heap<T extends IHeapItem> {
     }
 
     public dump(): void {
-        if (this.size() == 0)
-            return
+        if (this.size() === 0) {
+            return;
+        }
 
-        let idx = 0;
-        let leftIdx = this.getLeftChildIndex(idx);
-        let rightIdx = leftIdx + 1;
+        const idx = 0;
+        const leftIdx = this.getLeftChildIndex(idx);
+        const rightIdx = leftIdx + 1;
 
         console.log(this.array);
         console.log("--- keymap ---");
@@ -214,29 +222,30 @@ class Heap<T extends IHeapItem> {
         this.keyMap.put(this.array[i].getKey(), j);
         this.keyMap.put(this.array[j].getKey(), i);
 
-        let tmp: T = this.array[i];
+        const tmp: T = this.array[i];
         this.array[i] = this.array[j];
         this.array[j] = tmp;
     }
 
-
     private getLeftChildIndex(curIdx: number): number {
-        let idx: number = ((curIdx + 1) * 2) - 1;
-        if (idx >= this.array.length)
+        const idx: number = ((curIdx + 1) * 2) - 1;
+        if (idx >= this.array.length) {
             return -1;
-        else
+        } else {
             return idx;
+        }
     }
 
     private static getParentIndex(curIdx: number): number {
-        if (curIdx == 0)
+        if (curIdx === 0) {
             return -1;
+        }
 
         return Math.floor((curIdx + 1) / 2) - 1;
     }
 
-    clone(): Heap<T> {
-        let h = new Heap<T>();
+    public clone(): Heap<T> {
+        const h = new Heap<T>();
         h.array = this.array.slice(0);
         h.keyMap = this.keyMap.clone();
         return h;
@@ -259,7 +268,7 @@ export class PriorityQueue<T extends IHeapItem> {
         this.heap.checkHeapRequirement(key);
     }
 
-    get(key: string): T | null {
+    public get(key: string): T | null {
         return this.heap.at(key);
     }
 
@@ -271,14 +280,14 @@ export class PriorityQueue<T extends IHeapItem> {
         return this.heap.shift();
     }
 
-    dump() {
+    public dump() {
         this.heap.dump();
     }
 
     public contains(key: string) {
         return this.heap.contains(key);
     }
-    removeWhere(predicate: (el: T) => boolean) {
+    public removeWhere(predicate: (el: T) => boolean) {
         this.heap.removeWhere(predicate);
     }
 
@@ -286,8 +295,8 @@ export class PriorityQueue<T extends IHeapItem> {
         this.heap.foreach(func);
     }
 
-    clone(): PriorityQueue<T> {
-        let p = new PriorityQueue<T>();
+    public clone(): PriorityQueue<T> {
+        const p = new PriorityQueue<T>();
         p.heap = this.heap.clone();
         return p;
     }

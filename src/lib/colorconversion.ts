@@ -13,13 +13,14 @@
   */
 export function rgbToHsl(r: number, g: number, b: number) {
     r /= 255, g /= 255, b /= 255;
-    var max = Math.max(r, g, b), min = Math.min(r, g, b);
-    var h, s, l = (max + min) / 2;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    let h, s, l = (max + min) / 2;
 
-    if (max == min) {
+    if (max === min) {
         h = s = 0; // achromatic
     } else {
-        var d = max - min;
+        const d = max - min;
         s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
         switch (max) {
             case r: h = (g - b) / d + (g < b ? 6 : 0); break;
@@ -45,22 +46,22 @@ export function rgbToHsl(r: number, g: number, b: number) {
  * @return  Array           The RGB representation
  */
 export function hslToRgb(h: number, s: number, l: number) {
-    var r, g, b;
+    let r, g, b;
 
-    if (s == 0) {
+    if (s === 0) {
         r = g = b = l; // achromatic
     } else {
-        let hue2rgb = (p: number, q: number, t: number) => {
-            if (t < 0) t += 1;
-            if (t > 1) t -= 1;
-            if (t < 1 / 6) return p + (q - p) * 6 * t;
-            if (t < 1 / 2) return q;
-            if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+        const hue2rgb = (p: number, q: number, t: number) => {
+            if (t < 0) { t += 1; }
+            if (t > 1) { t -= 1; }
+            if (t < 1 / 6) { return p + (q - p) * 6 * t; }
+            if (t < 1 / 2) { return q; }
+            if (t < 2 / 3) { return p + (q - p) * (2 / 3 - t) * 6; }
             return p;
-        }
+        };
 
-        var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-        var p = 2 * l - q;
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
         r = hue2rgb(p, q, h + 1 / 3);
         g = hue2rgb(p, q, h);
         b = hue2rgb(p, q, h - 1 / 3);
@@ -72,7 +73,7 @@ export function hslToRgb(h: number, s: number, l: number) {
 // From https://github.com/antimatter15/rgb-lab/blob/master/color.js
 
 export function lab2rgb(lab: number[]) {
-    var y = (lab[0] + 16) / 116,
+    let y = (lab[0] + 16) / 116,
         x = lab[1] / 500 + y,
         z = y - lab[2] / 200,
         r, g, b;
@@ -91,12 +92,11 @@ export function lab2rgb(lab: number[]) {
 
     return [Math.max(0, Math.min(1, r)) * 255,
     Math.max(0, Math.min(1, g)) * 255,
-    Math.max(0, Math.min(1, b)) * 255]
+    Math.max(0, Math.min(1, b)) * 255];
 }
 
-
 export function rgb2lab(rgb: number[]) {
-    var r = rgb[0] / 255,
+    let r = rgb[0] / 255,
         g = rgb[1] / 255,
         b = rgb[2] / 255,
         x, y, z;
@@ -113,5 +113,5 @@ export function rgb2lab(rgb: number[]) {
     y = (y > 0.008856) ? Math.pow(y, 1 / 3) : (7.787 * y) + 16 / 116;
     z = (z > 0.008856) ? Math.pow(z, 1 / 3) : (7.787 * z) + 16 / 116;
 
-    return [(116 * y) - 16, 500 * (x - y), 200 * (y - z)]
+    return [(116 * y) - 16, 500 * (x - y), 200 * (y - z)];
 }
