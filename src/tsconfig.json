@@ -9,7 +9,7 @@
         "removeComments": false,
         "sourceMap": false,
         "module": "amd",
-        "target": "es5",
+        "target": "es6",
         "lib": [
             "dom",
             "es2015",

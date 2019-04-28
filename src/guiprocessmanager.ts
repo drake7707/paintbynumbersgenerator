@@ -91,15 +91,20 @@ export class GUIProcessManager {
     private static async processKmeansClustering(imgData: ImageData, tabsOutput: M.Tabs, ctx: CanvasRenderingContext2D,
         settings: Settings, cancellationToken: CancellationToken) {
         time("K-means clustering");
+        
         let cKmeans = <HTMLCanvasElement>document.getElementById("cKMeans");
         cKmeans.width = imgData.width;
         cKmeans.height = imgData.height;
+
         let ctxKmeans = cKmeans.getContext("2d")!;
         ctxKmeans.fillStyle = "white";
         ctxKmeans.fillRect(0, 0, cKmeans.width, cKmeans.height);
+
         let kmeansImgData = ctxKmeans.getImageData(0, 0, cKmeans.width, cKmeans.height);
+
         tabsOutput.select("kmeans-pane");
         $(".status.kMeans").addClass("active");
+
         await ColorReducer.applyKMeansClustering(imgData, kmeansImgData, ctx, settings, (kmeans) => {
             let progress = (100 - (kmeans.currentDeltaDistanceDifference > 100 ? 100 : kmeans.currentDeltaDistanceDifference)) / 100;
             $("#statusKMeans").css("width", Math.round(progress * 100) + "%");
@@ -108,6 +113,7 @@ export class GUIProcessManager {
             if (cancellationToken.isCancelled)
                 throw new Error("Cancelled");
         });
+
         $(".status").removeClass("active");
         $(".status.kMeans").addClass("complete");
         timeEnd("K-means clustering");

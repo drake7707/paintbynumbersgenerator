@@ -105,12 +105,17 @@ export class ColorReducer {
         // vectors of all the unique colors are built, time to cluster them
         let kmeans = new KMeans(vectors, settings.kMeansNrOfClusters);
 
-        let count = 0;
+        let curTime = new Date().getTime();
+      
+
         kmeans.step();
         while (kmeans.currentDeltaDistanceDifference > settings.kMeansMinDeltaDifference) {
             kmeans.step();
 
-            if (count++ % 2 == 0) {
+            // update GUI every 500ms
+            if (new Date().getTime() - curTime > 500) {
+                curTime = new Date().getTime();
+
                 await delay(0);
                 if (onUpdate != null) {
                     ColorReducer.updateKmeansOutputImageData(kmeans, settings, pointsByColor, imgData, outputImgData);
