@@ -10,7 +10,9 @@ define("common", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     function delay(ms) {
-        return new Promise((exec) => window.setTimeout(exec, ms));
+        return __awaiter(this, void 0, void 0, function* () {
+            return new Promise((exec) => window.setTimeout(exec, ms));
+        });
     }
     exports.delay = delay;
     class CancellationToken {
@@ -39,7 +41,7 @@ define("lib/clustering", ["require", "exports"], function (require, exports) {
          *  Calculates the weighted average of the given points
          */
         static average(pts) {
-            if (pts.length == 0) {
+            if (pts.length === 0) {
                 throw Error("Can't average 0 elements");
             }
             const dims = pts[0].values.length;
@@ -292,6 +294,13 @@ define("structs/typedarrays", ["require", "exports"], function (require, exports
         set(x, y, value) {
             this.arr[y * this.width + x] = value;
         }
+        matchAllAround(x, y, value) {
+            const idx = y * this.width + x;
+            return (x - 1 >= 0 && this.arr[idx - 1] === value) &&
+                (y - 1 >= 0 && this.arr[idx - this.width] === value) &&
+                (x + 1 < this.width && this.arr[idx + 1] === value) &&
+                (y + 1 < this.height && this.arr[idx + this.width] === value);
+        }
     }
     exports.Uint8Array2D = Uint8Array2D;
     class BooleanArray2D {
@@ -301,7 +310,7 @@ define("structs/typedarrays", ["require", "exports"], function (require, exports
             this.arr = new Uint8Array(width * height);
         }
         get(x, y) {
-            return this.arr[y * this.width + x] != 0;
+            return this.arr[y * this.width + x] !== 0;
         }
         set(x, y, value) {
             this.arr[y * this.width + x] = value ? 1 : 0;
@@ -1183,10 +1192,12 @@ define("facetmanagement", ["require", "exports", "common", "lib/fill", "lib/poly
                 facetResult.facetMap.set(ptx, pty, facetIndex);
                 facet.pointCount++;
                 // determine if the point is a border or not
-                const isInnerPoint = (ptx - 1 >= 0 && imgColorIndices.get(ptx - 1, pty) === facetColorIndex) &&
-                    (pty - 1 >= 0 && imgColorIndices.get(ptx, pty - 1) === facetColorIndex) &&
-                    (ptx + 1 < facetResult.width && imgColorIndices.get(ptx + 1, pty) === facetColorIndex) &&
-                    (pty + 1 < facetResult.height && imgColorIndices.get(ptx, pty + 1) === facetColorIndex);
+                /*  const isInnerPoint = (ptx - 1 >= 0 && imgColorIndices.get(ptx - 1, pty) === facetColorIndex) &&
+                      (pty - 1 >= 0 && imgColorIndices.get(ptx, pty - 1) === facetColorIndex) &&
+                      (ptx + 1 < facetResult.width && imgColorIndices.get(ptx + 1, pty) === facetColorIndex) &&
+                      (pty + 1 < facetResult.height && imgColorIndices.get(ptx, pty + 1) === facetColorIndex);
+                */
+                const isInnerPoint = imgColorIndices.matchAllAround(ptx, pty, facetColorIndex);
                 if (!isInnerPoint) {
                     facet.borderPoints.push(new point_1.Point(ptx, pty));
                 }
@@ -3039,6 +3050,27 @@ define("main", ["require", "exports", "gui", "lib/clipboard"], function (require
         $(".tabs").tabs();
         $(".tooltipped").tooltip();
         const clip = new clipboard_1.Clipboard("canvas", true);
+        $("#file").change(function (ev) {
+            const files = $("#file").get(0).files;
+            if (files !== null && files.length > 0) {
+                const reader = new FileReader();
+                reader.onloadend = function () {
+                    const img = document.createElement("img");
+                    img.onload = () => {
+                        const c = document.getElementById("canvas");
+                        const ctx = c.getContext("2d");
+                        c.width = img.naturalWidth;
+                        c.height = img.naturalHeight;
+                        ctx.drawImage(img, 0, 0);
+                    };
+                    img.onerror = () => {
+                        alert("Unable to load image");
+                    };
+                    img.src = reader.result;
+                };
+                reader.readAsDataURL(files[0]);
+            }
+        });
         gui_2.loadExample("imgSmall");
         $("#btnProcess").click(function () {
             return __awaiter(this, void 0, void 0, function* () {

@@ -21,8 +21,17 @@ export class Uint8Array2D {
     public get(x: number, y: number) {
         return this.arr[y * this.width + x];
     }
+
     public set(x: number, y: number, value: number) {
         this.arr[y * this.width + x] = value;
+    }
+
+    public matchAllAround(x: number, y: number, value: number) {
+        const idx = y * this.width + x;
+        return (x - 1 >= 0 && this.arr[idx - 1] === value) &&
+            (y - 1 >= 0 && this.arr[idx - this.width] === value) &&
+            (x + 1 < this.width && this.arr[idx + 1] === value) &&
+            (y + 1 < this.height && this.arr[idx + this.width] === value);
     }
 }
 
