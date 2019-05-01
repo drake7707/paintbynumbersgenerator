@@ -30,7 +30,7 @@ class PathPoint extends Point {
             x -= 0.5;
         } else if (this.orientation === OrientationEnum.Right) {
             x += 0.5;
-             }
+        }
         return x;
     }
 
@@ -40,7 +40,7 @@ class PathPoint extends Point {
             y -= 0.5;
         } else if (this.orientation === OrientationEnum.Bottom) {
             y += 0.5;
-             }
+        }
         return y;
     }
 
@@ -458,13 +458,13 @@ export class FacetReducer {
                         imgColorIndices.set(x, y, facetResult.facets[facetResult.facetMap.get(x - 1, y)]!.color);
                     } else if (y - 1 >= 0 && facetResult.facetMap.get(x, y - 1) !== facetToRemove.id && facetResult.facets[facetResult.facetMap.get(x, y - 1)] !== null) {
                         imgColorIndices.set(x, y, facetResult.facets[facetResult.facetMap.get(x, y - 1)]!.color);
-                    } else if (x + 1 < facetResult.width && facetResult.facetMap.get(x + 1, y) !== facetToRemove.id && facetResult.facets[facetResult.facetMap.get(x + 1, y)] !== null ) {
+                    } else if (x + 1 < facetResult.width && facetResult.facetMap.get(x + 1, y) !== facetToRemove.id && facetResult.facets[facetResult.facetMap.get(x + 1, y)] !== null) {
                         imgColorIndices.set(x, y, facetResult.facets[facetResult.facetMap.get(x + 1, y)]!.color);
                     } else if (y + 1 < facetResult.height && facetResult.facetMap.get(x, y + 1) !== facetToRemove.id && facetResult.facets[facetResult.facetMap.get(x, y + 1)] !== null) {
                         imgColorIndices.set(x, y, facetResult.facets[facetResult.facetMap.get(x, y + 1)]!.color);
                     } else {
                         console.error(`Unable to reallocate point ${x},${y}`);
-                         }
+                    }
                 }
             }
         }
@@ -625,11 +625,11 @@ export class FacetBorderTracer {
                     pt.orientation = OrientationEnum.Left;
                 } else if (pt.y - 1 < 0 || facetResult.facetMap.get(pt.x, pt.y - 1) !== f.id) {
                     pt.orientation = OrientationEnum.Top;
-                     } else if (pt.x + 1 >= facetResult.width || facetResult.facetMap.get(pt.x + 1, pt.y) !== f.id) {
+                } else if (pt.x + 1 >= facetResult.width || facetResult.facetMap.get(pt.x + 1, pt.y) !== f.id) {
                     pt.orientation = OrientationEnum.Right;
-                     } else if (pt.y + 1 >= facetResult.height || facetResult.facetMap.get(pt.x, pt.y + 1) !== f.id) {
+                } else if (pt.y + 1 >= facetResult.height || facetResult.facetMap.get(pt.x, pt.y + 1) !== f.id) {
                     pt.orientation = OrientationEnum.Bottom;
-                     }
+                }
 
                 // build a border path from that point
                 const path = FacetBorderTracer.getPath(pt, facetResult, f, borderMask, xWall, yWall);
@@ -1045,7 +1045,7 @@ export class FacetBorderTracer {
                 FacetBorderTracer.addPointToPath(path, pt, xWall, f, yWall);
             } else {
                 finished = true;
-                 }
+            }
         }
 
         // clear up the walls set for the path so the array can be reused
@@ -1117,8 +1117,11 @@ export class FacetBorderSegmenter {
                     let currentPoints: PathPoint[] = [];
                     currentPoints.push(f.borderPath[0]);
                     for (let i: number = 1; i < f.borderPath.length; i++) {
-                        const oldNeighbour = f.borderPath[i - 1].getNeighbour(facetResult);
-                        const curNeighbour = f.borderPath[i].getNeighbour(facetResult);
+                        const prevBorderPoint = f.borderPath[i - 1];
+                        const curBorderPoint = f.borderPath[i];
+
+                        const oldNeighbour = prevBorderPoint.getNeighbour(facetResult);
+                        const curNeighbour = curBorderPoint.getNeighbour(facetResult);
                         let isTransitionPoint = false;
                         if (oldNeighbour !== curNeighbour) {
                             isTransitionPoint = true;
@@ -1128,8 +1131,9 @@ export class FacetBorderSegmenter {
                             if (oldNeighbour !== -1) {
                                 // check for tight rotations to break path if diagonals contain a different neighbour,
                                 // see https://i.imgur.com/o6Srqwj.png for visual path of the issue
-                                if (f.borderPath[i - 1].x === f.borderPath[i].x &&
-                                    f.borderPath[i - 1].y === f.borderPath[i].y) {
+
+                                if (prevBorderPoint.x === curBorderPoint.x &&
+                                    prevBorderPoint.y === curBorderPoint.y) {
                                     // rotation turn
                                     // check the diagonal neighbour to see if it remains the same
                                     //   +---+---+
@@ -1137,27 +1141,27 @@ export class FacetBorderSegmenter {
                                     //   +---xxxx> (x = wall, dN = diagNeighbour)
                                     //   |   x f |
                                     //   +---v---+
-                                    if ((f.borderPath[i - 1].orientation === OrientationEnum.Top && f.borderPath[i].orientation === OrientationEnum.Left) ||
-                                        (f.borderPath[i - 1].orientation === OrientationEnum.Left && f.borderPath[i].orientation === OrientationEnum.Top)) {
-                                        const diagNeighbour = facetResult.facetMap.get(f.borderPath[i].x - 1, f.borderPath[i].y - 1);
+                                    if ((prevBorderPoint.orientation === OrientationEnum.Top && curBorderPoint.orientation === OrientationEnum.Left) ||
+                                        (prevBorderPoint.orientation === OrientationEnum.Left && curBorderPoint.orientation === OrientationEnum.Top)) {
+                                        const diagNeighbour = facetResult.facetMap.get(curBorderPoint.x - 1, curBorderPoint.y - 1);
                                         if (diagNeighbour !== oldNeighbour) {
                                             isTransitionPoint = true;
                                         }
-                                    } else if ((f.borderPath[i - 1].orientation === OrientationEnum.Top && f.borderPath[i].orientation === OrientationEnum.Right) ||
-                                        (f.borderPath[i - 1].orientation === OrientationEnum.Right && f.borderPath[i].orientation === OrientationEnum.Top)) {
-                                        const diagNeighbour = facetResult.facetMap.get(f.borderPath[i].x + 1, f.borderPath[i].y - 1);
+                                    } else if ((prevBorderPoint.orientation === OrientationEnum.Top && curBorderPoint.orientation === OrientationEnum.Right) ||
+                                        (prevBorderPoint.orientation === OrientationEnum.Right && curBorderPoint.orientation === OrientationEnum.Top)) {
+                                        const diagNeighbour = facetResult.facetMap.get(curBorderPoint.x + 1, curBorderPoint.y - 1);
                                         if (diagNeighbour !== oldNeighbour) {
                                             isTransitionPoint = true;
                                         }
-                                    } else if ((f.borderPath[i - 1].orientation === OrientationEnum.Bottom && f.borderPath[i].orientation === OrientationEnum.Left) ||
-                                        (f.borderPath[i - 1].orientation === OrientationEnum.Left && f.borderPath[i].orientation === OrientationEnum.Bottom)) {
-                                        const diagNeighbour = facetResult.facetMap.get(f.borderPath[i].x - 1, f.borderPath[i].y + 1);
+                                    } else if ((prevBorderPoint.orientation === OrientationEnum.Bottom && curBorderPoint.orientation === OrientationEnum.Left) ||
+                                        (prevBorderPoint.orientation === OrientationEnum.Left && curBorderPoint.orientation === OrientationEnum.Bottom)) {
+                                        const diagNeighbour = facetResult.facetMap.get(curBorderPoint.x - 1, curBorderPoint.y + 1);
                                         if (diagNeighbour !== oldNeighbour) {
                                             isTransitionPoint = true;
                                         }
-                                    } else if ((f.borderPath[i - 1].orientation === OrientationEnum.Bottom && f.borderPath[i].orientation === OrientationEnum.Right) ||
-                                        (f.borderPath[i - 1].orientation === OrientationEnum.Right && f.borderPath[i].orientation === OrientationEnum.Bottom)) {
-                                        const diagNeighbour = facetResult.facetMap.get(f.borderPath[i].x + 1, f.borderPath[i].y + 1);
+                                    } else if ((prevBorderPoint.orientation === OrientationEnum.Bottom && curBorderPoint.orientation === OrientationEnum.Right) ||
+                                        (prevBorderPoint.orientation === OrientationEnum.Right && curBorderPoint.orientation === OrientationEnum.Bottom)) {
+                                        const diagNeighbour = facetResult.facetMap.get(curBorderPoint.x + 1, curBorderPoint.y + 1);
                                         if (diagNeighbour !== oldNeighbour) {
                                             isTransitionPoint = true;
                                         }
@@ -1174,7 +1178,7 @@ export class FacetBorderSegmenter {
                                 currentPoints = [];
                             }
                         }
-                        currentPoints.push(f.borderPath[i]);
+                        currentPoints.push(curBorderPoint);
                     }
 
                     // finally check if there is a remainder partial segment and either prepend

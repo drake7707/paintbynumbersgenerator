@@ -16,7 +16,7 @@ export class Vector {
      *  Calculates the weighted average of the given points
      */
     public static average(pts: Vector[]): Vector {
-        if (pts.length == 0) {
+        if (pts.length === 0) {
             throw Error("Can't average 0 elements");
         }
 

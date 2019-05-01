@@ -2046,8 +2046,10 @@ define("facetmanagement", ["require", "exports", "common", "lib/fill", "lib/poly
                         let currentPoints = [];
                         currentPoints.push(f.borderPath[0]);
                         for (let i = 1; i < f.borderPath.length; i++) {
-                            const oldNeighbour = f.borderPath[i - 1].getNeighbour(facetResult);
-                            const curNeighbour = f.borderPath[i].getNeighbour(facetResult);
+                            const prevBorderPoint = f.borderPath[i - 1];
+                            const curBorderPoint = f.borderPath[i];
+                            const oldNeighbour = prevBorderPoint.getNeighbour(facetResult);
+                            const curNeighbour = curBorderPoint.getNeighbour(facetResult);
                             let isTransitionPoint = false;
                             if (oldNeighbour !== curNeighbour) {
                                 isTransitionPoint = true;
@@ -2058,8 +2060,8 @@ define("facetmanagement", ["require", "exports", "common", "lib/fill", "lib/poly
                                 if (oldNeighbour !== -1) {
                                     // check for tight rotations to break path if diagonals contain a different neighbour,
                                     // see https://i.imgur.com/o6Srqwj.png for visual path of the issue
-                                    if (f.borderPath[i - 1].x === f.borderPath[i].x &&
-                                        f.borderPath[i - 1].y === f.borderPath[i].y) {
+                                    if (prevBorderPoint.x === curBorderPoint.x &&
+                                        prevBorderPoint.y === curBorderPoint.y) {
                                         // rotation turn
                                         // check the diagonal neighbour to see if it remains the same
                                         //   +---+---+
@@ -2067,30 +2069,30 @@ define("facetmanagement", ["require", "exports", "common", "lib/fill", "lib/poly
                                         //   +---xxxx> (x = wall, dN = diagNeighbour)
                                         //   |   x f |
                                         //   +---v---+
-                                        if ((f.borderPath[i - 1].orientation === OrientationEnum.Top && f.borderPath[i].orientation === OrientationEnum.Left) ||
-                                            (f.borderPath[i - 1].orientation === OrientationEnum.Left && f.borderPath[i].orientation === OrientationEnum.Top)) {
-                                            const diagNeighbour = facetResult.facetMap.get(f.borderPath[i].x - 1, f.borderPath[i].y - 1);
+                                        if ((prevBorderPoint.orientation === OrientationEnum.Top && curBorderPoint.orientation === OrientationEnum.Left) ||
+                                            (prevBorderPoint.orientation === OrientationEnum.Left && curBorderPoint.orientation === OrientationEnum.Top)) {
+                                            const diagNeighbour = facetResult.facetMap.get(curBorderPoint.x - 1, curBorderPoint.y - 1);
                                             if (diagNeighbour !== oldNeighbour) {
                                                 isTransitionPoint = true;
                                             }
                                         }
-                                        else if ((f.borderPath[i - 1].orientation === OrientationEnum.Top && f.borderPath[i].orientation === OrientationEnum.Right) ||
-                                            (f.borderPath[i - 1].orientation === OrientationEnum.Right && f.borderPath[i].orientation === OrientationEnum.Top)) {
-                                            const diagNeighbour = facetResult.facetMap.get(f.borderPath[i].x + 1, f.borderPath[i].y - 1);
+                                        else if ((prevBorderPoint.orientation === OrientationEnum.Top && curBorderPoint.orientation === OrientationEnum.Right) ||
+                                            (prevBorderPoint.orientation === OrientationEnum.Right && curBorderPoint.orientation === OrientationEnum.Top)) {
+                                            const diagNeighbour = facetResult.facetMap.get(curBorderPoint.x + 1, curBorderPoint.y - 1);
                                             if (diagNeighbour !== oldNeighbour) {
                                                 isTransitionPoint = true;
                                             }
                                         }
-                                        else if ((f.borderPath[i - 1].orientation === OrientationEnum.Bottom && f.borderPath[i].orientation === OrientationEnum.Left) ||
-                                            (f.borderPath[i - 1].orientation === OrientationEnum.Left && f.borderPath[i].orientation === OrientationEnum.Bottom)) {
-                                            const diagNeighbour = facetResult.facetMap.get(f.borderPath[i].x - 1, f.borderPath[i].y + 1);
+                                        else if ((prevBorderPoint.orientation === OrientationEnum.Bottom && curBorderPoint.orientation === OrientationEnum.Left) ||
+                                            (prevBorderPoint.orientation === OrientationEnum.Left && curBorderPoint.orientation === OrientationEnum.Bottom)) {
+                                            const diagNeighbour = facetResult.facetMap.get(curBorderPoint.x - 1, curBorderPoint.y + 1);
                                             if (diagNeighbour !== oldNeighbour) {
                                                 isTransitionPoint = true;
                                             }
                                         }
-                                        else if ((f.borderPath[i - 1].orientation === OrientationEnum.Bottom && f.borderPath[i].orientation === OrientationEnum.Right) ||
-                                            (f.borderPath[i - 1].orientation === OrientationEnum.Right && f.borderPath[i].orientation === OrientationEnum.Bottom)) {
-                                            const diagNeighbour = facetResult.facetMap.get(f.borderPath[i].x + 1, f.borderPath[i].y + 1);
+                                        else if ((prevBorderPoint.orientation === OrientationEnum.Bottom && curBorderPoint.orientation === OrientationEnum.Right) ||
+                                            (prevBorderPoint.orientation === OrientationEnum.Right && curBorderPoint.orientation === OrientationEnum.Bottom)) {
+                                            const diagNeighbour = facetResult.facetMap.get(curBorderPoint.x + 1, curBorderPoint.y + 1);
                                             if (diagNeighbour !== oldNeighbour) {
                                                 isTransitionPoint = true;
                                             }
@@ -2107,7 +2109,7 @@ define("facetmanagement", ["require", "exports", "common", "lib/fill", "lib/poly
                                     currentPoints = [];
                                 }
                             }
-                            currentPoints.push(f.borderPath[i]);
+                            currentPoints.push(curBorderPoint);
                         }
                         // finally check if there is a remainder partial segment and either prepend
                         // the points to the first segment if they have the same neighbour or construct a
@@ -2905,10 +2907,10 @@ define("lib/clipboard", ["require", "exports"], function (require, exports) {
             this.ctx = this.canvas.getContext("2d");
             this.autoresize = autoresize;
             // handlers
-            document.addEventListener('keydown', function (e) {
+            document.addEventListener("keydown", function (e) {
                 _self.on_keyboard_action(e);
             }, false); // firefox fix
-            document.addEventListener('keyup', function (e) {
+            document.addEventListener("keyup", function (e) {
                 _self.on_keyboardup_action(e);
             }, false); // firefox fix
             document.addEventListener("paste", function (e) {
