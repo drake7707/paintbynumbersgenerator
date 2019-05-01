@@ -1,7 +1,7 @@
 // From https://stackoverflow.com/a/35576409/694640
 /**
  * image pasting into canvas
- * 
+ *
  * @param {string} canvas_id - canvas id
  * @param {boolean} autoresize - if canvas will be resized
  */
@@ -22,13 +22,13 @@ export class Clipboard {
         this.autoresize = autoresize;
 
         // handlers
-        document.addEventListener("keydown", function(e) {
+        document.addEventListener("keydown", function (e) {
             _self.on_keyboard_action(e);
         }, false); // firefox fix
-        document.addEventListener("keyup", function(e) {
+        document.addEventListener("keyup", function (e) {
             _self.on_keyboardup_action(e);
         }, false); // firefox fix
-        document.addEventListener("paste", function(e) {
+        document.addEventListener("paste", function (e) {
             _self.paste_auto(e);
         }, false); // official paste handler
 
@@ -45,8 +45,8 @@ export class Clipboard {
 
         const _self = this;
         // create an observer instance
-        const observer = new MutationObserver(function(mutations) {
-            mutations.forEach(function(mutation) {
+        const observer = new MutationObserver(function (mutations) {
+            mutations.forEach(function (mutation) {
                 if (_self.paste_event_support === true || _self.ctrl_pressed === false || mutation.type !== "childList") {
                     // we already got data in paste_auto()
                     return true;
@@ -59,7 +59,7 @@ export class Clipboard {
                         _self.paste_createImage((mutation.addedNodes[0] as HTMLImageElement).src);
                     }
                     // register cleanup after some time.
-                    setTimeout(function() {
+                    setTimeout(function () {
                         _self.pasteCatcher.innerHTML = "";
                     }, 20);
                 }
@@ -137,7 +137,7 @@ export class Clipboard {
     private paste_createImage(source: any) {
         const pastedImage = new Image();
         const self = this;
-        pastedImage.onload = function() {
+        pastedImage.onload = function () {
             if (self.autoresize === true) {
                 // resize
                 self.canvas.width = pastedImage.width;

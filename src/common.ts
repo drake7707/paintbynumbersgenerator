@@ -5,7 +5,7 @@ export interface IMap<T> {
     [key: string]: T;
 }
 
-export function delay(ms: number) {
+export async function delay(ms: number) {
     return new Promise((exec) => window.setTimeout(exec, ms));
 }
 

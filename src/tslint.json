@@ -6,7 +6,13 @@
        "max-line-length":false,
        "no-console":false,
        "no-bitwise":false,
-       "member-ordering":false
+       "member-ordering":false,
+       "promise-function-async":true,
+       "await-promise":true,
+       "only-arrow-functions":false,
+       "variable-name": [ false ],
+       "no-angle-bracket-type-assertion": false,
+       "space-before-function-paren": false
     },
     "jsRules": {
        

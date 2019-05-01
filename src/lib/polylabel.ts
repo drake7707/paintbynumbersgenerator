@@ -21,7 +21,7 @@ export function polylabel(polygon: Polygon, precision: number = 1.0): PointResul
     let minY = Number.MAX_VALUE;
     let maxX = Number.MIN_VALUE;
     let maxY = Number.MIN_VALUE;
-    
+
     for (let i = 0; i < polygon[0].length; i++) {
         const p = polygon[0][i];
         if (p.x < minX) { minX = p.x; }

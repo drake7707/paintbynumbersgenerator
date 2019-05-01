@@ -33,7 +33,7 @@ export class BooleanArray2D {
     }
 
     public get(x: number, y: number) {
-        return this.arr[y * this.width + x] != 0;
+        return this.arr[y * this.width + x] !== 0;
     }
     public set(x: number, y: number, value: boolean) {
         this.arr[y * this.width + x] = value ? 1 : 0;
