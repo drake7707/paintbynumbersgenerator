@@ -1,0 +1,17 @@
+{
+    "kMeansNrOfClusters": 16,
+    "kMeansMinDeltaDifference": 1,
+    "kMeansClusteringColorSpace": 0,
+    "removeFacetsSmallerThanNrOfPoints": 20,
+    "removeFacetsFromLargeToSmall": true,
+    "nrOfTimesToHalveBorderSegments": 2,
+    "resizeImageIfTooLarge": true,
+    "resizeImageWidth": 1024,
+    "resizeImageHeight": 1024,
+
+    "svgSizeMultiplier": 3,
+    "svgShowLabels": true,
+    "svgFillFacets": true,
+    "svgShowBorders": true,
+    "svgFontSize": 6
+}
