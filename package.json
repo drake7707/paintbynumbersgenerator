@@ -2,6 +2,7 @@
   "name": "paint-by-numbers-generator",
   "version": "1.0.0",
   "description": "Paint by numbers generator",
+  "bin": "./src-cli/main.js",
   "scripts": {
     "lite": "lite-server --port 10001",
     "start": "npm run lite"

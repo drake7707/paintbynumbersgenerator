@@ -2,9 +2,22 @@
     "kMeansNrOfClusters": 16,
     "kMeansMinDeltaDifference": 1,
     "kMeansClusteringColorSpace": 0,
+
+    "kMeansColorRestrictions": [
+        [ 0, 0 ,0 ],
+        [ 255, 0, 0 ],
+        [ 0, 255, 0 ],
+        [ 0, 0, 255 ],
+        [ 64, 64, 64 ],
+        [ 128, 128, 128 ],
+        [ 192, 192, 192 ],
+        [ 255, 255, 255 ]
+    ],
+
     "removeFacetsSmallerThanNrOfPoints": 20,
     "removeFacetsFromLargeToSmall": true,
     "nrOfTimesToHalveBorderSegments": 2,
+    
     "resizeImageIfTooLarge": true,
     "resizeImageWidth": 1024,
     "resizeImageHeight": 1024,

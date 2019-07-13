@@ -122,7 +122,7 @@ export class ColorReducer {
 
                 await delay(0);
                 if (onUpdate != null) {
-                    ColorReducer.updateKmeansOutputImageData(kmeans, settings, pointsByColor, imgData, outputImgData);
+                    ColorReducer.updateKmeansOutputImageData(kmeans, settings, pointsByColor, imgData, outputImgData, false);
                     onUpdate(kmeans);
                 }
             }
@@ -130,7 +130,7 @@ export class ColorReducer {
         }
 
         // update the output image data (because it will be used for further processing)
-        ColorReducer.updateKmeansOutputImageData(kmeans, settings, pointsByColor, imgData, outputImgData);
+        ColorReducer.updateKmeansOutputImageData(kmeans, settings, pointsByColor, imgData, outputImgData, true);
 
         if (onUpdate != null) {
             onUpdate(kmeans);
@@ -140,7 +140,8 @@ export class ColorReducer {
     /**
      *  Updates the image data from the current kmeans centroids and their respective associated colors (vectors)
      */
-    public static updateKmeansOutputImageData(kmeans: KMeans, settings: Settings, pointsByColor: IMap<number[]>, imgData: ImageData, outputImgData: ImageData) {
+    public static updateKmeansOutputImageData(kmeans: KMeans, settings: Settings, pointsByColor: IMap<number[]>, imgData: ImageData, outputImgData: ImageData, restrictToSpecifiedColors: boolean) {
+
 
         for (let c: number = 0; c < kmeans.centroids.length; c++) {
             // for each cluster centroid
@@ -161,6 +162,30 @@ export class ColorReducer {
                     rgb = lab2rgb(lab);
                 } else {
                     rgb = centroid.values;
+                }
+
+                if (restrictToSpecifiedColors) {
+                    if (settings.kMeansColorRestrictions.length > 0) {
+                        // there are color restrictions, for each centroid find the color from the color restrictions that's the closest
+                        let minDistance = Number.MAX_VALUE;
+                        let closestRestrictedColor: RGB | null = null;
+                        for (const color of settings.kMeansColorRestrictions) {
+                            // RGB distance is not very good for the human eye perception, convert both to lab and then calculate the distance
+                            const centroidLab = rgb2lab(rgb);
+                            const restrictionLab = rgb2lab(color);
+                            const distance = Math.sqrt((centroidLab[0] - restrictionLab[0]) * (centroidLab[0] - restrictionLab[0]) +
+                                (centroidLab[1] - restrictionLab[1]) * (centroidLab[1] - restrictionLab[1]) +
+                                (centroidLab[2] - restrictionLab[2]) * (centroidLab[2] - restrictionLab[2]));
+                            if (distance < minDistance) {
+                                minDistance = distance;
+                                closestRestrictedColor = color;
+                            }
+                        }
+                        // use this color instead
+                        if (closestRestrictedColor !== null) {
+                            rgb = closestRestrictedColor;
+                        }
+                    }
                 }
 
                 // replace all pixels of the old color by the new centroid color

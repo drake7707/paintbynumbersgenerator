@@ -1,3 +1,4 @@
+import { RGB } from "./common";
 
 export enum ClusteringColorSpace {
     RGB = 0,
@@ -9,6 +10,9 @@ export class Settings {
     public kMeansNrOfClusters: number = 16;
     public kMeansMinDeltaDifference: number = 1;
     public kMeansClusteringColorSpace: ClusteringColorSpace = ClusteringColorSpace.RGB;
+
+    public kMeansColorRestrictions: RGB[] = [];
+
     public removeFacetsSmallerThanNrOfPoints: number = 20;
     public removeFacetsFromLargeToSmall: boolean = true;
     public nrOfTimesToHalveBorderSegments: number = 2;

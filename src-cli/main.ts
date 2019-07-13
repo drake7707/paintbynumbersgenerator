@@ -1,7 +1,7 @@
 import * as canvas from "canvas";
 import * as minimist from "minimist";
 import * as process from "process";
-
+import * as path from "path";
 import * as fs from "fs";
 import { ColorReducer } from "../src/colorreductionmanagement";
 import { RGB } from "../src/common";
@@ -22,9 +22,18 @@ async function main() {
     const imagePath = args["i"];
     const svgPath = args["o"];
 
+    if (typeof imagePath === "undefined" || typeof svgPath === "undefined") {
+        console.log("Usage: exe -i <input_image> -o <output_svg> [-c <settings_json>]");
+        process.exit(1);
+    }
+
     let configPath = args["c"];
     if (typeof configPath === "undefined") {
-        configPath = "./settings.json";
+        configPath = path.join(process.cwd(), "settings.json");
+    } else {
+        if (!path.isAbsolute(configPath)) {
+            configPath = path.join(process.cwd(), configPath);
+        }
     }
 
     const settings: CLISettings = require(configPath);
@@ -107,6 +116,30 @@ async function main() {
     const svgString = await createSVG(facetResult, colormapResult.colorsByIndex, settings.svgSizeMultiplier, settings.svgFillFacets, settings.svgShowBorders, settings.svgShowLabels, settings.svgFontSize);
 
     fs.writeFileSync(svgPath, svgString);
+
+    console.log("Generating palette info");
+    const palettePath = path.join(path.dirname(svgPath), path.basename(svgPath).substr(0, path.basename(svgPath).length - path.extname(svgPath).length) + ".json");
+
+    const colorFrequency: number[] = [];
+    for (const color of colormapResult.colorsByIndex) {
+        colorFrequency.push(0);
+    }
+
+    for (const facet of facetResult.facets) {
+        if (facet !== null) {
+            colorFrequency[facet.color] += facet.pointCount;
+        }
+    }
+
+    const paletteInfo = JSON.stringify(colormapResult.colorsByIndex.map((color, index) => {
+        return {
+            index: index,
+            color: color,
+            frequency: colorFrequency[index]
+        };
+    }), null, 2);
+
+    fs.writeFileSync(palettePath, paletteInfo);
 }
 
 async function createSVG(facetResult: FacetResult, colorsByIndex: RGB[], sizeMultiplier: number, fill: boolean, stroke: boolean, addColorLabels: boolean, fontSize: number = 6, onUpdate: ((progress: number) => void) | null = null) {
