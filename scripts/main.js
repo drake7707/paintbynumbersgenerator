@@ -3143,7 +3143,7 @@ define("main", ["require", "exports", "gui", "lib/clipboard"], function (require
                 }
             });
         });
-        $("#chkShowLabels, #chkFillFacets, #chkShowBorders, #txtSizeMultiplier, #txtLabelFontSize #txtLabelFontColor").change(() => __awaiter(this, void 0, void 0, function* () {
+        $("#chkShowLabels, #chkFillFacets, #chkShowBorders, #txtSizeMultiplier, #txtLabelFontSize, #txtLabelFontColor").change(() => __awaiter(this, void 0, void 0, function* () {
             yield gui_2.updateOutput();
         }));
         $("#btnDownloadSVG").click(function () {
