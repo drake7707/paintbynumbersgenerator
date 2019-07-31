@@ -22,9 +22,22 @@
     "resizeImageWidth": 1024,
     "resizeImageHeight": 1024,
 
-    "svgSizeMultiplier": 3,
-    "svgShowLabels": true,
-    "svgFillFacets": true,
-    "svgShowBorders": true,
+    "outputProfiles": [
+        {
+            "name": "full",
+            "svgShowLabels": true,
+            "svgFillFacets": true,
+            "svgShowBorders": true,
+            "svgSizeMultiplier": 3
+        },
+        {
+            "name": "bordersLabels",
+            "svgShowLabels": true,
+            "svgFillFacets": false,
+            "svgShowBorders": true,
+            "svgSizeMultiplier": 3
+        }
+    ],
+    
     "svgFontSize": 6
 }

@@ -9,11 +9,17 @@ import { FacetBorderSegmenter, FacetBorderTracer, FacetCreator, FacetLabelPlacer
 import { Settings } from "../src/settings";
 import { Point } from "../src/structs/point";
 
-class CLISettings extends Settings {
-    public svgSizeMultiplier: number = 3;
+class CLISettingsOutputProfile {
+    public name: string = "";
     public svgShowLabels: boolean = true;
     public svgFillFacets: boolean = true;
     public svgShowBorders: boolean = true;
+    public svgSizeMultiplier: number = 3;
+}
+
+class CLISettings extends Settings {
+
+    public outputProfiles: CLISettingsOutputProfile[] = [];
     public svgFontSize: number = 6;
 }
 
@@ -112,10 +118,16 @@ async function main() {
         // progress
     });
 
-    console.log("Generating svg");
-    const svgString = await createSVG(facetResult, colormapResult.colorsByIndex, settings.svgSizeMultiplier, settings.svgFillFacets, settings.svgShowBorders, settings.svgShowLabels, settings.svgFontSize);
 
-    fs.writeFileSync(svgPath, svgString);
+    for (const profile of settings.outputProfiles) {
+        console.log("Generating output for " + profile);
+
+        const svgProfilePath = path.join(path.dirname(svgPath), path.basename(svgPath).substr(0, path.basename(svgPath).length - path.extname(svgPath).length) + "-" + profile.name + path.extname(svgPath));
+        const svgString = await createSVG(facetResult, colormapResult.colorsByIndex, profile.svgSizeMultiplier, profile.svgFillFacets, profile.svgShowBorders, profile.svgShowLabels, settings.svgFontSize);
+
+        fs.writeFileSync(svgProfilePath, svgString);
+    }
+
 
     console.log("Generating palette info");
     const palettePath = path.join(path.dirname(svgPath), path.basename(svgPath).substr(0, path.basename(svgPath).length - path.extname(svgPath).length) + ".json");
