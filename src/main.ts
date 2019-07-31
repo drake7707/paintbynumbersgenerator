@@ -40,7 +40,7 @@ $(document).ready(function () {
         }
     });
 
-    $("#chkShowLabels, #chkFillFacets, #chkShowBorders, #txtSizeMultiplier, #txtLabelFontSize").change(async () => {
+    $("#chkShowLabels, #chkFillFacets, #chkShowBorders, #txtSizeMultiplier, #txtLabelFontSize #txtLabelFontColor").change(async () => {
         await updateOutput();
     });
 

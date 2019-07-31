@@ -6,7 +6,7 @@ import { ColorMapResult, ColorReducer } from "./colorreductionmanagement";
 import { CancellationToken, delay, IMap, RGB } from "./common";
 import { FacetBorderSegmenter, FacetBorderTracer, FacetCreator, FacetLabelPlacer, FacetReducer, FacetResult } from "./facetmanagement";
 import { time, timeEnd } from "./gui";
-import {  Settings } from "./settings";
+import { Settings } from "./settings";
 import { Point } from "./structs/point";
 
 export class ProcessResult {
@@ -85,7 +85,7 @@ export class GUIProcessManager {
     }
 
     private static async processKmeansClustering(imgData: ImageData, tabsOutput: M.Tabs, ctx: CanvasRenderingContext2D,
-                                                 settings: Settings, cancellationToken: CancellationToken) {
+        settings: Settings, cancellationToken: CancellationToken) {
         time("K-means clustering");
 
         const cKmeans = document.getElementById("cKMeans") as HTMLCanvasElement;
@@ -268,7 +268,7 @@ export class GUIProcessManager {
     /**
      *  Creates a vector based SVG image of the facets with the given configuration
      */
-    public static async createSVG(facetResult: FacetResult, colorsByIndex: RGB[], sizeMultiplier: number, fill: boolean, stroke: boolean, addColorLabels: boolean, fontSize: number = 6, onUpdate: ((progress: number) => void) | null = null) {
+    public static async createSVG(facetResult: FacetResult, colorsByIndex: RGB[], sizeMultiplier: number, fill: boolean, stroke: boolean, addColorLabels: boolean, fontSize: number = 6, fontColor: string = "black", onUpdate: ((progress: number) => void) | null = null) {
         const xmlns = "http://www.w3.org/2000/svg";
         const svg = document.createElementNS(xmlns, "svg");
         svg.setAttribute("width", sizeMultiplier * facetResult.width + "");
@@ -329,12 +329,11 @@ export class GUIProcessManager {
                 // so I don't know why you would hide them
                 if (addColorLabels) {
                     const txt = document.createElementNS(xmlns, "text");
-                    txt.setAttribute("x", "50%");
-                    txt.setAttribute("y", "50%");
-                    txt.setAttribute("alignment-baseline", "middle");
-                    txt.setAttribute("text-anchor", "middle");
                     txt.setAttribute("font-family", "Tahoma");
                     txt.setAttribute("font-size", fontSize + "");
+                    txt.setAttribute("dominant-baseline", "middle");
+                    txt.setAttribute("text-anchor", "middle");
+                    txt.setAttribute("fill", fontColor);
 
                     txt.textContent = f.color + "";
 
@@ -342,6 +341,9 @@ export class GUIProcessManager {
                     subsvg.setAttribute("width", f.labelBounds.width * sizeMultiplier + "");
                     subsvg.setAttribute("height", f.labelBounds.height * sizeMultiplier + "");
                     subsvg.setAttribute("overflow", "visible");
+                    subsvg.setAttribute("viewBox", "-50 -50 100 100");
+                    subsvg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+
                     subsvg.appendChild(txt);
 
                     const g = document.createElementNS(xmlns, "g");

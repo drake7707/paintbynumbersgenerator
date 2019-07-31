@@ -11,7 +11,12 @@ define("common", ["require", "exports"], function (require, exports) {
     Object.defineProperty(exports, "__esModule", { value: true });
     function delay(ms) {
         return __awaiter(this, void 0, void 0, function* () {
-            return new Promise((exec) => window.setTimeout(exec, ms));
+            if (typeof window !== "undefined") {
+                return new Promise((exec) => window.setTimeout(exec, ms));
+            }
+            else {
+                return new Promise((exec) => exec());
+            }
         });
     }
     exports.delay = delay;
@@ -255,6 +260,7 @@ define("settings", ["require", "exports"], function (require, exports) {
             this.kMeansNrOfClusters = 16;
             this.kMeansMinDeltaDifference = 1;
             this.kMeansClusteringColorSpace = ClusteringColorSpace.RGB;
+            this.kMeansColorRestrictions = [];
             this.removeFacetsSmallerThanNrOfPoints = 20;
             this.removeFacetsFromLargeToSmall = true;
             this.nrOfTimesToHalveBorderSegments = 2;
@@ -423,13 +429,13 @@ define("colorreductionmanagement", ["require", "exports", "common", "lib/cluster
                         curTime = new Date().getTime();
                         yield common_1.delay(0);
                         if (onUpdate != null) {
-                            ColorReducer.updateKmeansOutputImageData(kmeans, settings, pointsByColor, imgData, outputImgData);
+                            ColorReducer.updateKmeansOutputImageData(kmeans, settings, pointsByColor, imgData, outputImgData, false);
                             onUpdate(kmeans);
                         }
                     }
                 }
                 // update the output image data (because it will be used for further processing)
-                ColorReducer.updateKmeansOutputImageData(kmeans, settings, pointsByColor, imgData, outputImgData);
+                ColorReducer.updateKmeansOutputImageData(kmeans, settings, pointsByColor, imgData, outputImgData, true);
                 if (onUpdate != null) {
                     onUpdate(kmeans);
                 }
@@ -438,7 +444,7 @@ define("colorreductionmanagement", ["require", "exports", "common", "lib/cluster
         /**
          *  Updates the image data from the current kmeans centroids and their respective associated colors (vectors)
          */
-        static updateKmeansOutputImageData(kmeans, settings, pointsByColor, imgData, outputImgData) {
+        static updateKmeansOutputImageData(kmeans, settings, pointsByColor, imgData, outputImgData, restrictToSpecifiedColors) {
             for (let c = 0; c < kmeans.centroids.length; c++) {
                 // for each cluster centroid
                 const centroid = kmeans.centroids[c];
@@ -459,6 +465,29 @@ define("colorreductionmanagement", ["require", "exports", "common", "lib/cluster
                     }
                     else {
                         rgb = centroid.values;
+                    }
+                    if (restrictToSpecifiedColors) {
+                        if (settings.kMeansColorRestrictions.length > 0) {
+                            // there are color restrictions, for each centroid find the color from the color restrictions that's the closest
+                            let minDistance = Number.MAX_VALUE;
+                            let closestRestrictedColor = null;
+                            for (const color of settings.kMeansColorRestrictions) {
+                                // RGB distance is not very good for the human eye perception, convert both to lab and then calculate the distance
+                                const centroidLab = colorconversion_1.rgb2lab(rgb);
+                                const restrictionLab = colorconversion_1.rgb2lab(color);
+                                const distance = Math.sqrt((centroidLab[0] - restrictionLab[0]) * (centroidLab[0] - restrictionLab[0]) +
+                                    (centroidLab[1] - restrictionLab[1]) * (centroidLab[1] - restrictionLab[1]) +
+                                    (centroidLab[2] - restrictionLab[2]) * (centroidLab[2] - restrictionLab[2]));
+                                if (distance < minDistance) {
+                                    minDistance = distance;
+                                    closestRestrictedColor = color;
+                                }
+                            }
+                            // use this color instead
+                            if (closestRestrictedColor !== null) {
+                                rgb = closestRestrictedColor;
+                            }
+                        }
                     }
                     // replace all pixels of the old color by the new centroid color
                     const pointColor = `${v.values[0]},${v.values[1]},${v.values[2]}`;
@@ -2610,7 +2639,7 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
         /**
          *  Creates a vector based SVG image of the facets with the given configuration
          */
-        static createSVG(facetResult, colorsByIndex, sizeMultiplier, fill, stroke, addColorLabels, fontSize = 6, onUpdate = null) {
+        static createSVG(facetResult, colorsByIndex, sizeMultiplier, fill, stroke, addColorLabels, fontSize = 6, fontColor = "black", onUpdate = null) {
             return __awaiter(this, void 0, void 0, function* () {
                 const xmlns = "http://www.w3.org/2000/svg";
                 const svg = document.createElementNS(xmlns, "svg");
@@ -2667,17 +2696,18 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                         // so I don't know why you would hide them
                         if (addColorLabels) {
                             const txt = document.createElementNS(xmlns, "text");
-                            txt.setAttribute("x", "50%");
-                            txt.setAttribute("y", "50%");
-                            txt.setAttribute("alignment-baseline", "middle");
-                            txt.setAttribute("text-anchor", "middle");
                             txt.setAttribute("font-family", "Tahoma");
                             txt.setAttribute("font-size", fontSize + "");
+                            txt.setAttribute("dominant-baseline", "middle");
+                            txt.setAttribute("text-anchor", "middle");
+                            txt.setAttribute("fill", fontColor);
                             txt.textContent = f.color + "";
                             const subsvg = document.createElementNS(xmlns, "svg");
                             subsvg.setAttribute("width", f.labelBounds.width * sizeMultiplier + "");
                             subsvg.setAttribute("height", f.labelBounds.height * sizeMultiplier + "");
                             subsvg.setAttribute("overflow", "visible");
+                            subsvg.setAttribute("viewBox", "-50 -50 100 100");
+                            subsvg.setAttribute("preserveAspectRatio", "xMidYMid meet");
                             subsvg.appendChild(txt);
                             const g = document.createElementNS(xmlns, "g");
                             g.setAttribute("class", "label");
@@ -2752,6 +2782,36 @@ define("gui", ["require", "exports", "common", "guiprocessmanager", "settings"],
         settings.resizeImageIfTooLarge = $("#chkResizeImage").prop("checked");
         settings.resizeImageWidth = parseInt($("#txtResizeWidth").val() + "");
         settings.resizeImageHeight = parseInt($("#txtResizeHeight").val() + "");
+        const restrictedColorLines = ($("#txtKMeansColorRestrictions").val() + "").split("\n");
+        for (const line of restrictedColorLines) {
+            const tline = line.trim();
+            if (tline.indexOf("//") === 0) {
+                // comment, skip
+            }
+            else {
+                const rgbparts = tline.split(",");
+                if (rgbparts.length === 3) {
+                    let red = parseInt(rgbparts[0]);
+                    let green = parseInt(rgbparts[1]);
+                    let blue = parseInt(rgbparts[2]);
+                    if (red < 0)
+                        red = 0;
+                    if (red > 255)
+                        red = 255;
+                    if (green < 0)
+                        green = 0;
+                    if (green > 255)
+                        green = 255;
+                    if (blue < 0)
+                        blue = 0;
+                    if (blue > 255)
+                        blue = 255;
+                    if (!isNaN(red) && !isNaN(green) && !isNaN(blue)) {
+                        settings.kMeansColorRestrictions.push([red, green, blue]);
+                    }
+                }
+            }
+        }
         return settings;
     }
     exports.parseSettings = parseSettings;
@@ -2781,10 +2841,11 @@ define("gui", ["require", "exports", "common", "guiprocessmanager", "settings"],
                 const stroke = $("#chkShowBorders").prop("checked");
                 const sizeMultiplier = parseInt($("#txtSizeMultiplier").val() + "");
                 const fontSize = parseInt($("#txtLabelFontSize").val() + "");
+                const fontColor = $("#txtLabelFontColor").val() + "";
                 $("#statusSVGGenerate").css("width", "0%");
                 $(".status.SVGGenerate").removeClass("complete");
                 $(".status.SVGGenerate").addClass("active");
-                const svg = yield guiprocessmanager_1.GUIProcessManager.createSVG(processResult.facetResult, processResult.colorsByIndex, sizeMultiplier, fill, stroke, showLabels, fontSize, (progress) => {
+                const svg = yield guiprocessmanager_1.GUIProcessManager.createSVG(processResult.facetResult, processResult.colorsByIndex, sizeMultiplier, fill, stroke, showLabels, fontSize, fontColor, (progress) => {
                     if (cancellationToken.isCancelled) {
                         throw new Error("Cancelled");
                     }
@@ -3082,7 +3143,7 @@ define("main", ["require", "exports", "gui", "lib/clipboard"], function (require
                 }
             });
         });
-        $("#chkShowLabels, #chkFillFacets, #chkShowBorders, #txtSizeMultiplier, #txtLabelFontSize").change(() => __awaiter(this, void 0, void 0, function* () {
+        $("#chkShowLabels, #chkFillFacets, #chkShowBorders, #txtSizeMultiplier, #txtLabelFontSize #txtLabelFontColor").change(() => __awaiter(this, void 0, void 0, function* () {
             yield gui_2.updateOutput();
         }));
         $("#btnDownloadSVG").click(function () {

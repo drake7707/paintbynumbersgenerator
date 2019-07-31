@@ -56,6 +56,31 @@ export function parseSettings(): Settings {
     settings.resizeImageWidth = parseInt($("#txtResizeWidth").val() + "");
     settings.resizeImageHeight = parseInt($("#txtResizeHeight").val() + "");
 
+    const restrictedColorLines = ($("#txtKMeansColorRestrictions").val() + "").split("\n");
+    for (const line of restrictedColorLines) {
+        const tline = line.trim();
+        if (tline.indexOf("//") === 0) {
+            // comment, skip
+        } else {
+            const rgbparts = tline.split(",");
+            if (rgbparts.length === 3) {
+                let red = parseInt(rgbparts[0]);
+                let green = parseInt(rgbparts[1]);
+                let blue = parseInt(rgbparts[2]);
+                if (red < 0) red = 0;
+                if (red > 255) red = 255;
+                if (green < 0) green = 0;
+                if (green > 255) green = 255;
+                if (blue < 0) blue = 0;
+                if (blue > 255) blue = 255;
+
+                if (!isNaN(red) && !isNaN(green) && !isNaN(blue)) {
+                    settings.kMeansColorRestrictions.push([red, green, blue]);
+                }
+            }
+        }
+    }
+
     return settings;
 }
 
@@ -84,12 +109,14 @@ export async function updateOutput() {
         const sizeMultiplier = parseInt($("#txtSizeMultiplier").val() + "");
         const fontSize = parseInt($("#txtLabelFontSize").val() + "");
 
+        const fontColor = $("#txtLabelFontColor").val() + "";
+
         $("#statusSVGGenerate").css("width", "0%");
 
         $(".status.SVGGenerate").removeClass("complete");
         $(".status.SVGGenerate").addClass("active");
 
-        const svg = await GUIProcessManager.createSVG(processResult.facetResult, processResult.colorsByIndex, sizeMultiplier, fill, stroke, showLabels, fontSize, (progress) => {
+        const svg = await GUIProcessManager.createSVG(processResult.facetResult, processResult.colorsByIndex, sizeMultiplier, fill, stroke, showLabels, fontSize, fontColor, (progress) => {
             if (cancellationToken.isCancelled) { throw new Error("Cancelled"); }
             $("#statusSVGGenerate").css("width", Math.round(progress * 100) + "%");
         });
