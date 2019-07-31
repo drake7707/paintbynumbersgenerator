@@ -22,12 +22,13 @@ export class Clipboard {
         this.autoresize = autoresize;
 
         // handlers
-        document.addEventListener("keydown", function (e) {
-            _self.on_keyboard_action(e);
-        }, false); // firefox fix
-        document.addEventListener("keyup", function (e) {
-            _self.on_keyboardup_action(e);
-        }, false); // firefox fix
+        // document.addEventListener("keydown", function (e) {
+        //     _self.on_keyboard_action(e);
+        // }, false); // firefox fix
+        // document.addEventListener("keyup", function (e) {
+        //     _self.on_keyboardup_action(e);
+        // }, false); // firefox fix
+  
         document.addEventListener("paste", function (e) {
             _self.paste_auto(e);
         }, false); // official paste handler
@@ -90,15 +91,18 @@ export class Clipboard {
                         const URLObj = window.URL || (window as any).webkitURL;
                         const source = URLObj.createObjectURL(blob);
                         this.paste_createImage(source);
+                        e.preventDefault();
+                        return false;
                     }
                 }
-                e.preventDefault();
             } else {
                 // wait for DOMSubtreeModified event
                 // https://bugzilla.mozilla.org/show_bug.cgi?id=891247
             }
         }
+        return true;
     }
+
     // on keyboard press
     private on_keyboard_action(event: any) {
         const k = event.keyCode;
@@ -120,7 +124,7 @@ export class Clipboard {
             }
         }
 
-        return false;
+        return true;
     }
 
     // on keyboard release

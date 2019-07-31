@@ -2979,12 +2979,12 @@ define("lib/clipboard", ["require", "exports"], function (require, exports) {
             this.ctx = this.canvas.getContext("2d");
             this.autoresize = autoresize;
             // handlers
-            document.addEventListener("keydown", function (e) {
-                _self.on_keyboard_action(e);
-            }, false); // firefox fix
-            document.addEventListener("keyup", function (e) {
-                _self.on_keyboardup_action(e);
-            }, false); // firefox fix
+            // document.addEventListener("keydown", function (e) {
+            //     _self.on_keyboard_action(e);
+            // }, false); // firefox fix
+            // document.addEventListener("keyup", function (e) {
+            //     _self.on_keyboardup_action(e);
+            // }, false); // firefox fix
             document.addEventListener("paste", function (e) {
                 _self.paste_auto(e);
             }, false); // official paste handler
@@ -3041,15 +3041,17 @@ define("lib/clipboard", ["require", "exports"], function (require, exports) {
                             const URLObj = window.URL || window.webkitURL;
                             const source = URLObj.createObjectURL(blob);
                             this.paste_createImage(source);
+                            e.preventDefault();
+                            return false;
                         }
                     }
-                    e.preventDefault();
                 }
                 else {
                     // wait for DOMSubtreeModified event
                     // https://bugzilla.mozilla.org/show_bug.cgi?id=891247
                 }
             }
+            return true;
         }
         // on keyboard press
         on_keyboard_action(event) {
@@ -3070,7 +3072,7 @@ define("lib/clipboard", ["require", "exports"], function (require, exports) {
                     this.pasteCatcher.focus();
                 }
             }
-            return false;
+            return true;
         }
         // on keyboard release
         on_keyboardup_action(event) {
