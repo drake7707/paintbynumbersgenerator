@@ -20,7 +20,8 @@ class CLISettingsOutputProfile {
 class CLISettings extends Settings {
 
     public outputProfiles: CLISettingsOutputProfile[] = [];
-    public svgFontSize: number = 6;
+    public svgFontSize: number = 60;
+    public svgFontColor: string = "black";
 }
 
 async function main() {
@@ -120,10 +121,10 @@ async function main() {
 
 
     for (const profile of settings.outputProfiles) {
-        console.log("Generating output for " + profile);
+        console.log("Generating output for " + profile.name);
 
         const svgProfilePath = path.join(path.dirname(svgPath), path.basename(svgPath).substr(0, path.basename(svgPath).length - path.extname(svgPath).length) + "-" + profile.name + path.extname(svgPath));
-        const svgString = await createSVG(facetResult, colormapResult.colorsByIndex, profile.svgSizeMultiplier, profile.svgFillFacets, profile.svgShowBorders, profile.svgShowLabels, settings.svgFontSize);
+        const svgString = await createSVG(facetResult, colormapResult.colorsByIndex, profile.svgSizeMultiplier, profile.svgFillFacets, profile.svgShowBorders, profile.svgShowLabels, settings.svgFontSize, settings.svgFontColor);
 
         fs.writeFileSync(svgProfilePath, svgString);
     }
@@ -154,7 +155,7 @@ async function main() {
     fs.writeFileSync(palettePath, paletteInfo);
 }
 
-async function createSVG(facetResult: FacetResult, colorsByIndex: RGB[], sizeMultiplier: number, fill: boolean, stroke: boolean, addColorLabels: boolean, fontSize: number = 6, onUpdate: ((progress: number) => void) | null = null) {
+async function createSVG(facetResult: FacetResult, colorsByIndex: RGB[], sizeMultiplier: number, fill: boolean, stroke: boolean, addColorLabels: boolean, fontSize: number = 60, fontColor: string = "black", onUpdate: ((progress: number) => void) | null = null) {
 
     let svgString = "";
     const xmlns = "http://www.w3.org/2000/svg";
@@ -235,9 +236,15 @@ async function createSVG(facetResult: FacetResult, colorsByIndex: RGB[], sizeMul
                 const labelWidth = f.labelBounds.width * sizeMultiplier;
                 const labelHeight = f.labelBounds.height * sizeMultiplier;
 
+                //     const svgLabelString = `<g class="label" transform="translate(${labelOffsetX},${labelOffsetY})">
+                //     <svg width="${labelWidth}" height="${labelHeight}" overflow="visible" viewBox="-50 -50 100 100" preserveAspectRatio="xMidYMid meet">
+                //         <rect xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" fill="rgb(255,255,255,0.5)" x="-50" y="-50"/>
+                //         <text font-family="Tahoma" font-size="60" dominant-baseline="middle" text-anchor="middle">${f.color}</text>
+                //     </svg>
+                //    </g>`;
                 const svgLabelString = `<g class="label" transform="translate(${labelOffsetX},${labelOffsetY})">
-                                        <svg width="${labelWidth}" height="${labelHeight}" overflow="visible">
-                                            <text x="50%" y="50%" alignment-baseline="middle" text-anchor="middle" font-family="Tahoma" font-size="${fontSize}">${f.color}</text>
+                                        <svg width="${labelWidth}" height="${labelHeight}" overflow="visible" viewBox="-50 -50 100 100" preserveAspectRatio="xMidYMid meet">
+                                            <text font-family="Tahoma" font-size="${fontSize}" dominant-baseline="middle" text-anchor="middle" fill="${fontColor}">${f.color}</text>
                                         </svg>
                                        </g>`;
 

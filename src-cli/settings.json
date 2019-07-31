@@ -39,5 +39,6 @@
         }
     ],
     
-    "svgFontSize": 6
+    "svgFontSize": 50,
+    "svgFontColor": "#666"
 }
