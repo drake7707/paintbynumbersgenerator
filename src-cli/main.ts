@@ -1,8 +1,8 @@
 import * as canvas from "canvas";
-import * as minimist from "minimist";
-import * as process from "process";
-import * as path from "path";
 import * as fs from "fs";
+import * as minimist from "minimist";
+import * as path from "path";
+import * as process from "process";
 import { ColorReducer } from "../src/colorreductionmanagement";
 import { RGB } from "../src/common";
 import { FacetBorderSegmenter, FacetBorderTracer, FacetCreator, FacetLabelPlacer, FacetReducer, FacetResult } from "../src/facetmanagement";
@@ -144,11 +144,20 @@ async function main() {
         }
     }
 
+    const colorAliasesByColor:{ [key:string]:string } = {};
+    for (const alias of Object.keys(settings.colorAliases)) {
+        colorAliasesByColor[settings.colorAliases[alias].join(",")] = alias;
+    }
+
+    const totalFrequency = colorFrequency.reduce((sum,val) => sum+val);
+
     const paletteInfo = JSON.stringify(colormapResult.colorsByIndex.map((color, index) => {
         return {
             index: index,
             color: color,
-            frequency: colorFrequency[index]
+            colorAlias: colorAliasesByColor[color.join(",")],
+            frequency: colorFrequency[index],
+            areaPercentage:  colorFrequency[index] / totalFrequency
         };
     }), null, 2);
 

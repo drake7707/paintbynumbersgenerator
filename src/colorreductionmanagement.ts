@@ -142,7 +142,6 @@ export class ColorReducer {
      */
     public static updateKmeansOutputImageData(kmeans: KMeans, settings: Settings, pointsByColor: IMap<number[]>, imgData: ImageData, outputImgData: ImageData, restrictToSpecifiedColors: boolean) {
 
-
         for (let c: number = 0; c < kmeans.centroids.length; c++) {
             // for each cluster centroid
             const centroid = kmeans.centroids[c];
@@ -168,11 +167,18 @@ export class ColorReducer {
                     if (settings.kMeansColorRestrictions.length > 0) {
                         // there are color restrictions, for each centroid find the color from the color restrictions that's the closest
                         let minDistance = Number.MAX_VALUE;
-                        let closestRestrictedColor: RGB | null = null;
+                        let closestRestrictedColor: RGB | string | null = null;
                         for (const color of settings.kMeansColorRestrictions) {
                             // RGB distance is not very good for the human eye perception, convert both to lab and then calculate the distance
                             const centroidLab = rgb2lab(rgb);
-                            const restrictionLab = rgb2lab(color);
+
+                            let restrictionLab: number[];
+                            if (typeof color === "string") {
+                                restrictionLab = rgb2lab(settings.colorAliases[color]);
+                            } else {
+                                restrictionLab = rgb2lab(color);
+                            }
+
                             const distance = Math.sqrt((centroidLab[0] - restrictionLab[0]) * (centroidLab[0] - restrictionLab[0]) +
                                 (centroidLab[1] - restrictionLab[1]) * (centroidLab[1] - restrictionLab[1]) +
                                 (centroidLab[2] - restrictionLab[2]) * (centroidLab[2] - restrictionLab[2]));
@@ -183,7 +189,11 @@ export class ColorReducer {
                         }
                         // use this color instead
                         if (closestRestrictedColor !== null) {
-                            rgb = closestRestrictedColor;
+                            if (typeof closestRestrictedColor === "string") {
+                                rgb = settings.colorAliases[closestRestrictedColor];
+                            } else {
+                                rgb = closestRestrictedColor;
+                            }
                         }
                     }
                 }

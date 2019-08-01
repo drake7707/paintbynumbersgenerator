@@ -4,16 +4,18 @@
     "kMeansClusteringColorSpace": 0,
 
     "kMeansColorRestrictions": [
-        [ 0, 0 ,0 ],
-        [ 255, 0, 0 ],
-        [ 0, 255, 0 ],
-        [ 0, 0, 255 ],
-        [ 64, 64, 64 ],
-        [ 128, 128, 128 ],
-        [ 192, 192, 192 ],
+        "A1", "A2", "A3", "B1", "B2", "B3",
         [ 255, 255, 255 ]
     ],
-
+    "colorAliases": {
+        "A1": [0,0,0],
+        "A2": [ 255, 0, 0 ],
+        "A3": [ 0, 255, 0 ],
+        "A4": [ 0, 0, 255 ],
+        "B1":  [ 64, 64, 64 ],
+        "B2": [ 128, 128, 128 ],
+        "B3":  [ 192, 192, 192 ]
+    },
     "removeFacetsSmallerThanNrOfPoints": 20,
     "removeFacetsFromLargeToSmall": true,
     "nrOfTimesToHalveBorderSegments": 2,

@@ -11,7 +11,9 @@ export class Settings {
     public kMeansMinDeltaDifference: number = 1;
     public kMeansClusteringColorSpace: ClusteringColorSpace = ClusteringColorSpace.RGB;
 
-    public kMeansColorRestrictions: RGB[] = [];
+    public kMeansColorRestrictions: Array<RGB | string> = [];
+
+    public colorAliases: { [key: string]: RGB } = {};
 
     public removeFacetsSmallerThanNrOfPoints: number = 20;
     public removeFacetsFromLargeToSmall: boolean = true;

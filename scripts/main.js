@@ -261,6 +261,7 @@ define("settings", ["require", "exports"], function (require, exports) {
             this.kMeansMinDeltaDifference = 1;
             this.kMeansClusteringColorSpace = ClusteringColorSpace.RGB;
             this.kMeansColorRestrictions = [];
+            this.colorAliases = {};
             this.removeFacetsSmallerThanNrOfPoints = 20;
             this.removeFacetsFromLargeToSmall = true;
             this.nrOfTimesToHalveBorderSegments = 2;
@@ -474,7 +475,13 @@ define("colorreductionmanagement", ["require", "exports", "common", "lib/cluster
                             for (const color of settings.kMeansColorRestrictions) {
                                 // RGB distance is not very good for the human eye perception, convert both to lab and then calculate the distance
                                 const centroidLab = colorconversion_1.rgb2lab(rgb);
-                                const restrictionLab = colorconversion_1.rgb2lab(color);
+                                let restrictionLab;
+                                if (typeof color === "string") {
+                                    restrictionLab = colorconversion_1.rgb2lab(settings.colorAliases[color]);
+                                }
+                                else {
+                                    restrictionLab = colorconversion_1.rgb2lab(color);
+                                }
                                 const distance = Math.sqrt((centroidLab[0] - restrictionLab[0]) * (centroidLab[0] - restrictionLab[0]) +
                                     (centroidLab[1] - restrictionLab[1]) * (centroidLab[1] - restrictionLab[1]) +
                                     (centroidLab[2] - restrictionLab[2]) * (centroidLab[2] - restrictionLab[2]));
@@ -485,7 +492,12 @@ define("colorreductionmanagement", ["require", "exports", "common", "lib/cluster
                             }
                             // use this color instead
                             if (closestRestrictedColor !== null) {
-                                rgb = closestRestrictedColor;
+                                if (typeof closestRestrictedColor === "string") {
+                                    rgb = settings.colorAliases[closestRestrictedColor];
+                                }
+                                else {
+                                    rgb = closestRestrictedColor;
+                                }
                             }
                         }
                     }
