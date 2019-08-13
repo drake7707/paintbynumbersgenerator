@@ -332,7 +332,7 @@ export class GUIProcessManager {
 
                 svg.appendChild(svgPath);
 
-                for (const seg of f.borderSegments) {
+              /*  for (const seg of f.borderSegments) {
                     const svgSegPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
                     let segData = "M ";
                     const segPoints = seg.originalSegment.points;
@@ -353,7 +353,7 @@ export class GUIProcessManager {
                     svgSegPath.style.fill = "none";
                     svg.appendChild(svgSegPath);
                 }
-                
+                */
 
                 // add the color labels if necessary. I mean, this is the whole idea behind the paint by numbers part
                 // so I don't know why you would hide them
