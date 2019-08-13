@@ -2712,7 +2712,7 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
         /**
          *  Creates a vector based SVG image of the facets with the given configuration
          */
-        static createSVG(facetResult, colorsByIndex, sizeMultiplier, fill, stroke, addColorLabels, fontSize = 6, fontColor = "black", onUpdate = null) {
+        static createSVG(facetResult, colorsByIndex, sizeMultiplier, fill, stroke, addColorLabels, fontSize = 50, fontColor = "black", onUpdate = null) {
             return __awaiter(this, void 0, void 0, function* () {
                 const xmlns = "http://www.w3.org/2000/svg";
                 const svg = document.createElementNS(xmlns, "svg");
@@ -2799,7 +2799,8 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                         if (addColorLabels) {
                             const txt = document.createElementNS(xmlns, "text");
                             txt.setAttribute("font-family", "Tahoma");
-                            txt.setAttribute("font-size", fontSize + "");
+                            const nrOfDigits = (f.color + "").length;
+                            txt.setAttribute("font-size", (fontSize / nrOfDigits) + "");
                             txt.setAttribute("dominant-baseline", "middle");
                             txt.setAttribute("text-anchor", "middle");
                             txt.setAttribute("fill", fontColor);

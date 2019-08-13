@@ -268,7 +268,7 @@ export class GUIProcessManager {
     /**
      *  Creates a vector based SVG image of the facets with the given configuration
      */
-    public static async createSVG(facetResult: FacetResult, colorsByIndex: RGB[], sizeMultiplier: number, fill: boolean, stroke: boolean, addColorLabels: boolean, fontSize: number = 6, fontColor: string = "black", onUpdate: ((progress: number) => void) | null = null) {
+    public static async createSVG(facetResult: FacetResult, colorsByIndex: RGB[], sizeMultiplier: number, fill: boolean, stroke: boolean, addColorLabels: boolean, fontSize: number = 50, fontColor: string = "black", onUpdate: ((progress: number) => void) | null = null) {
         const xmlns = "http://www.w3.org/2000/svg";
         const svg = document.createElementNS(xmlns, "svg");
         svg.setAttribute("width", sizeMultiplier * facetResult.width + "");
@@ -289,7 +289,7 @@ export class GUIProcessManager {
                     }*/
                 } else {
                     for (let i: number = 0; i < f.borderPath.length; i++) {
-                        newpath.push(new Point(f.borderPath[i].getWallX()+0.5, f.borderPath[i].getWallY()+0.5));
+                        newpath.push(new Point(f.borderPath[i].getWallX() + 0.5, f.borderPath[i].getWallY() + 0.5));
                     }
                 }
                 if (newpath[0].x !== newpath[newpath.length - 1].x || newpath[0].y !== newpath[newpath.length - 1].y) {
@@ -332,35 +332,36 @@ export class GUIProcessManager {
 
                 svg.appendChild(svgPath);
 
-              /*  for (const seg of f.borderSegments) {
-                    const svgSegPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                    let segData = "M ";
-                    const segPoints = seg.originalSegment.points;
-                    segData += segPoints[0].x * sizeMultiplier + " " + segPoints[0].y * sizeMultiplier + " ";
-                    for (let i: number = 1; i < segPoints.length; i++) {
-                        const midpointX = (segPoints[i].x + segPoints[i - 1].x) / 2;
-                        const midpointY = (segPoints[i].y + segPoints[i - 1].y) / 2;
-                        //data += "Q " + (midpointX * sizeMultiplier) + " " + (midpointY * sizeMultiplier) + " " + (newpath[i].x * sizeMultiplier) + " " + (newpath[i].y * sizeMultiplier) + " ";
-                        segData += "L " + (segPoints[i].x * sizeMultiplier) + " " + (segPoints[i].y * sizeMultiplier) + " ";
-                    }
-
-                    console.log("Facet " + f.id + ", segment " + segPoints[0].x + "," + segPoints[0].y + " -> " + segPoints[segPoints.length-1].x + "," +  segPoints[segPoints.length-1].y);
-
-                    svgSegPath.setAttribute("data-segmentFacet", f.id + "");
-                    // Set path's data
-                    svgSegPath.setAttribute("d", segData);
-                    svgSegPath.style.stroke = "#FF0";
-                    svgSegPath.style.fill = "none";
-                    svg.appendChild(svgSegPath);
-                }
-                */
+                /*  for (const seg of f.borderSegments) {
+                      const svgSegPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                      let segData = "M ";
+                      const segPoints = seg.originalSegment.points;
+                      segData += segPoints[0].x * sizeMultiplier + " " + segPoints[0].y * sizeMultiplier + " ";
+                      for (let i: number = 1; i < segPoints.length; i++) {
+                          const midpointX = (segPoints[i].x + segPoints[i - 1].x) / 2;
+                          const midpointY = (segPoints[i].y + segPoints[i - 1].y) / 2;
+                          //data += "Q " + (midpointX * sizeMultiplier) + " " + (midpointY * sizeMultiplier) + " " + (newpath[i].x * sizeMultiplier) + " " + (newpath[i].y * sizeMultiplier) + " ";
+                          segData += "L " + (segPoints[i].x * sizeMultiplier) + " " + (segPoints[i].y * sizeMultiplier) + " ";
+                      }
+  
+                      console.log("Facet " + f.id + ", segment " + segPoints[0].x + "," + segPoints[0].y + " -> " + segPoints[segPoints.length-1].x + "," +  segPoints[segPoints.length-1].y);
+  
+                      svgSegPath.setAttribute("data-segmentFacet", f.id + "");
+                      // Set path's data
+                      svgSegPath.setAttribute("d", segData);
+                      svgSegPath.style.stroke = "#FF0";
+                      svgSegPath.style.fill = "none";
+                      svg.appendChild(svgSegPath);
+                  }
+                  */
 
                 // add the color labels if necessary. I mean, this is the whole idea behind the paint by numbers part
                 // so I don't know why you would hide them
                 if (addColorLabels) {
                     const txt = document.createElementNS(xmlns, "text");
                     txt.setAttribute("font-family", "Tahoma");
-                    txt.setAttribute("font-size", fontSize + "");
+                    const nrOfDigits = (f.color + "").length;
+                    txt.setAttribute("font-size", (fontSize / nrOfDigits) + "");
                     txt.setAttribute("dominant-baseline", "middle");
                     txt.setAttribute("text-anchor", "middle");
                     txt.setAttribute("fill", fontColor);
