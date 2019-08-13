@@ -1148,17 +1148,23 @@ define("facetmanagement", ["require", "exports", "common", "lib/fill", "lib/poly
              */
             this.neighbourFacetsIsDirty = false;
         }
-        getFullPathFromBorderSegments() {
+        getFullPathFromBorderSegments(useWalls) {
             const newpath = [];
             for (const seg of this.borderSegments) {
                 if (seg.reverseOrder) {
                     for (let i = seg.originalSegment.points.length - 1; i >= 0; i--) {
-                        newpath.push(new point_1.Point(seg.originalSegment.points[i].getWallX(), seg.originalSegment.points[i].getWallY()));
+                        if (useWalls)
+                            newpath.push(new point_1.Point(seg.originalSegment.points[i].getWallX(), seg.originalSegment.points[i].getWallY()));
+                        else
+                            newpath.push(new point_1.Point(seg.originalSegment.points[i].x, seg.originalSegment.points[i].y));
                     }
                 }
                 else {
                     for (let i = 0; i < seg.originalSegment.points.length; i++) {
-                        newpath.push(new point_1.Point(seg.originalSegment.points[i].getWallX(), seg.originalSegment.points[i].getWallY()));
+                        if (useWalls)
+                            newpath.push(new point_1.Point(seg.originalSegment.points[i].getWallX(), seg.originalSegment.points[i].getWallY()));
+                        else
+                            newpath.push(new point_1.Point(seg.originalSegment.points[i].x, seg.originalSegment.points[i].y));
                     }
                 }
             }
@@ -2152,16 +2158,16 @@ define("facetmanagement", ["require", "exports", "common", "lib/fill", "lib/poly
                                     }
                                 }
                             }
+                            currentPoints.push(curBorderPoint);
                             if (isTransitionPoint) {
                                 // aha! a transition point, create the current points as new segment
                                 // and start a new list
                                 if (currentPoints.length > 0) {
                                     const segment = new PathSegment(currentPoints, oldNeighbour);
                                     segments.push(segment);
-                                    currentPoints = [];
+                                    currentPoints = [curBorderPoint];
                                 }
                             }
-                            currentPoints.push(curBorderPoint);
                         }
                         // finally check if there is a remainder partial segment and either prepend
                         // the points to the first segment if they have the same neighbour or construct a
@@ -2250,6 +2256,7 @@ define("facetmanagement", ["require", "exports", "common", "lib/fill", "lib/poly
         static matchSegmentsWithNeighbours(facetResult, segmentsPerFacet, onUpdate = null) {
             return __awaiter(this, void 0, void 0, function* () {
                 // max distance of the start/end points of the segment that it can be before the segments don't match up
+                // must be < 2 or else you'd end up with small border segments being wrongly reversed, e.g. https://i.imgur.com/XZQhxRV.png
                 const MAX_DISTANCE = 2;
                 // reserve room
                 for (const f of facetResult.facets) {
@@ -2356,7 +2363,7 @@ define("facetmanagement", ["require", "exports", "common", "lib/fill", "lib/poly
                     if (f != null) {
                         const polyRings = [];
                         // get the border path from the segments (that can have been reduced compared to facet actual border path)
-                        const borderPath = f.getFullPathFromBorderSegments();
+                        const borderPath = f.getFullPathFromBorderSegments(true);
                         // outer path must be first ring
                         polyRings.push(borderPath);
                         const onlyOuterRing = [borderPath];
@@ -2367,7 +2374,7 @@ define("facetmanagement", ["require", "exports", "common", "lib/fill", "lib/poly
                             FacetCreator.buildFacetNeighbour(f, facetResult);
                         }
                         for (const neighbourIdx of f.neighbourFacets) {
-                            const neighbourPath = facetResult.facets[neighbourIdx].getFullPathFromBorderSegments();
+                            const neighbourPath = facetResult.facets[neighbourIdx].getFullPathFromBorderSegments(true);
                             const fallsInside = FacetLabelPlacer.doesNeighbourFallInsideInCurrentFacet(neighbourPath, f, onlyOuterRing);
                             if (fallsInside) {
                                 polyRings.push(neighbourPath);
@@ -2624,7 +2631,7 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                     for (const f of facetResult.facets) {
                         if (f != null && progress > f.id / facetResult.facets.length) {
                             ctxBorderSegment.beginPath();
-                            const path = f.getFullPathFromBorderSegments();
+                            const path = f.getFullPathFromBorderSegments(false);
                             ctxBorderSegment.moveTo(path[0].x, path[0].y);
                             for (let i = 1; i < path.length; i++) {
                                 ctxBorderSegment.lineTo(path[i].x, path[i].y);
@@ -2684,12 +2691,12 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                         let newpath = [];
                         const useSegments = true;
                         if (useSegments) {
-                            newpath = f.getFullPathFromBorderSegments();
+                            newpath = f.getFullPathFromBorderSegments(false);
                             // shift from wall coordinates to pixel centers
-                            for (const p of newpath) {
-                                p.x += 0.5;
-                                p.y += 0.5;
-                            }
+                            /*for (const p of newpath) {
+                                p.x+=0.5;
+                                p.y+=0.5;
+                            }*/
                         }
                         else {
                             for (let i = 0; i < f.borderPath.length; i++) {
@@ -2708,7 +2715,9 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                             const midpointX = (newpath[i].x + newpath[i - 1].x) / 2;
                             const midpointY = (newpath[i].y + newpath[i - 1].y) / 2;
                             data += "Q " + (midpointX * sizeMultiplier) + " " + (midpointY * sizeMultiplier) + " " + (newpath[i].x * sizeMultiplier) + " " + (newpath[i].y * sizeMultiplier) + " ";
+                            //data += "L " + (newpath[i].x * sizeMultiplier) + " " + (newpath[i].y * sizeMultiplier) + " ";
                         }
+                        data += "Z";
                         svgPath.setAttribute("data-facetId", f.id + "");
                         // Set path's data
                         svgPath.setAttribute("d", data);
@@ -2730,6 +2739,25 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                             svgPath.style.fill = "none";
                         }
                         svg.appendChild(svgPath);
+                        for (const seg of f.borderSegments) {
+                            const svgSegPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                            let segData = "M ";
+                            const segPoints = seg.originalSegment.points;
+                            segData += segPoints[0].x * sizeMultiplier + " " + segPoints[0].y * sizeMultiplier + " ";
+                            for (let i = 1; i < segPoints.length; i++) {
+                                const midpointX = (segPoints[i].x + segPoints[i - 1].x) / 2;
+                                const midpointY = (segPoints[i].y + segPoints[i - 1].y) / 2;
+                                //data += "Q " + (midpointX * sizeMultiplier) + " " + (midpointY * sizeMultiplier) + " " + (newpath[i].x * sizeMultiplier) + " " + (newpath[i].y * sizeMultiplier) + " ";
+                                segData += "L " + (segPoints[i].x * sizeMultiplier) + " " + (segPoints[i].y * sizeMultiplier) + " ";
+                            }
+                            console.log("Facet " + f.id + ", segment " + segPoints[0].x + "," + segPoints[0].y + " -> " + segPoints[segPoints.length - 1].x + "," + segPoints[segPoints.length - 1].y);
+                            svgSegPath.setAttribute("data-segmentFacet", f.id + "");
+                            // Set path's data
+                            svgSegPath.setAttribute("d", segData);
+                            svgSegPath.style.stroke = "#FF0";
+                            svgSegPath.style.fill = "none";
+                            svg.appendChild(svgSegPath);
+                        }
                         // add the color labels if necessary. I mean, this is the whole idea behind the paint by numbers part
                         // so I don't know why you would hide them
                         if (addColorLabels) {

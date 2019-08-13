@@ -124,16 +124,22 @@ class Facet {
 
     public labelBounds!: BoundingBox;
 
-    public getFullPathFromBorderSegments() {
+    public getFullPathFromBorderSegments(useWalls: boolean) {
         const newpath: Point[] = [];
         for (const seg of this.borderSegments) {
             if (seg.reverseOrder) {
                 for (let i: number = seg.originalSegment.points.length - 1; i >= 0; i--) {
-                    newpath.push(new Point(seg.originalSegment.points[i].getWallX(), seg.originalSegment.points[i].getWallY()));
+                    if (useWalls)
+                        newpath.push(new Point(seg.originalSegment.points[i].getWallX(), seg.originalSegment.points[i].getWallY()));
+                    else
+                        newpath.push(new Point(seg.originalSegment.points[i].x, seg.originalSegment.points[i].y));
                 }
             } else {
                 for (let i: number = 0; i < seg.originalSegment.points.length; i++) {
-                    newpath.push(new Point(seg.originalSegment.points[i].getWallX(), seg.originalSegment.points[i].getWallY()));
+                    if (useWalls)
+                        newpath.push(new Point(seg.originalSegment.points[i].getWallX(), seg.originalSegment.points[i].getWallY()));
+                    else
+                        newpath.push(new Point(seg.originalSegment.points[i].x, seg.originalSegment.points[i].y));
                 }
             }
         }
@@ -1171,16 +1177,17 @@ export class FacetBorderSegmenter {
                                 }
                             }
                         }
+                        currentPoints.push(curBorderPoint);
+
                         if (isTransitionPoint) {
                             // aha! a transition point, create the current points as new segment
                             // and start a new list
                             if (currentPoints.length > 0) {
                                 const segment = new PathSegment(currentPoints, oldNeighbour);
                                 segments.push(segment);
-                                currentPoints = [];
+                                currentPoints = [ curBorderPoint];
                             }
                         }
-                        currentPoints.push(curBorderPoint);
                     }
 
                     // finally check if there is a remainder partial segment and either prepend
@@ -1243,7 +1250,7 @@ export class FacetBorderSegmenter {
                 reducedPath.push(new PathPoint(new Point(cx, cy), OrientationEnum.Left));
             } else {
                 reducedPath.push(newpath[i]);
-                reducedPath.push(newpath[i+1]);
+                reducedPath.push(newpath[i + 1]);
             }
         }
 
@@ -1281,6 +1288,7 @@ export class FacetBorderSegmenter {
     private static async matchSegmentsWithNeighbours(facetResult: FacetResult, segmentsPerFacet: Array<Array<PathSegment | null>>, onUpdate: ((progress: number) => void) | null = null) {
 
         // max distance of the start/end points of the segment that it can be before the segments don't match up
+        // must be < 2 or else you'd end up with small border segments being wrongly reversed, e.g. https://i.imgur.com/XZQhxRV.png
         const MAX_DISTANCE = 2;
 
         // reserve room
@@ -1398,7 +1406,7 @@ export class FacetLabelPlacer {
                 const polyRings: Point[][] = [];
 
                 // get the border path from the segments (that can have been reduced compared to facet actual border path)
-                const borderPath = f.getFullPathFromBorderSegments();
+                const borderPath = f.getFullPathFromBorderSegments(true);
                 // outer path must be first ring
                 polyRings.push(borderPath);
 
@@ -1410,7 +1418,7 @@ export class FacetLabelPlacer {
                 if (f.neighbourFacetsIsDirty) { FacetCreator.buildFacetNeighbour(f, facetResult); }
                 for (const neighbourIdx of f.neighbourFacets!) {
 
-                    const neighbourPath = facetResult.facets[neighbourIdx]!.getFullPathFromBorderSegments();
+                    const neighbourPath = facetResult.facets[neighbourIdx]!.getFullPathFromBorderSegments(true);
 
                     const fallsInside: boolean = FacetLabelPlacer.doesNeighbourFallInsideInCurrentFacet(neighbourPath, f, onlyOuterRing);
 

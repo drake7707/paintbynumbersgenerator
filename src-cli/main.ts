@@ -180,7 +180,7 @@ async function createSVG(facetResult: FacetResult, colorsByIndex: RGB[], sizeMul
             let newpath: Point[] = [];
             const useSegments = true;
             if (useSegments) {
-                newpath = f.getFullPathFromBorderSegments();
+                newpath = f.getFullPathFromBorderSegments(true);
                 // shift from wall coordinates to pixel centers
                 for (const p of newpath) {
                     p.x+=0.5;

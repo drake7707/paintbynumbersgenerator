@@ -220,7 +220,7 @@ export class GUIProcessManager {
             for (const f of facetResult.facets) {
                 if (f != null && progress > f.id / facetResult.facets.length) {
                     ctxBorderSegment.beginPath();
-                    const path = f.getFullPathFromBorderSegments();
+                    const path = f.getFullPathFromBorderSegments(false);
                     ctxBorderSegment.moveTo(path[0].x, path[0].y);
                     for (let i: number = 1; i < path.length; i++) {
                         ctxBorderSegment.lineTo(path[i].x, path[i].y);
@@ -281,12 +281,12 @@ export class GUIProcessManager {
                 let newpath: Point[] = [];
                 const useSegments = true;
                 if (useSegments) {
-                    newpath = f.getFullPathFromBorderSegments();
+                    newpath = f.getFullPathFromBorderSegments(false);
                     // shift from wall coordinates to pixel centers
-                    for (const p of newpath) {
+                    /*for (const p of newpath) {
                         p.x+=0.5;
                         p.y+=0.5;
-                    }
+                    }*/
                 } else {
                     for (let i: number = 0; i < f.borderPath.length; i++) {
                         newpath.push(new Point(f.borderPath[i].getWallX()+0.5, f.borderPath[i].getWallY()+0.5));
@@ -305,7 +305,9 @@ export class GUIProcessManager {
                     const midpointX = (newpath[i].x + newpath[i - 1].x) / 2;
                     const midpointY = (newpath[i].y + newpath[i - 1].y) / 2;
                     data += "Q " + (midpointX * sizeMultiplier) + " " + (midpointY * sizeMultiplier) + " " + (newpath[i].x * sizeMultiplier) + " " + (newpath[i].y * sizeMultiplier) + " ";
+                    //data += "L " + (newpath[i].x * sizeMultiplier) + " " + (newpath[i].y * sizeMultiplier) + " ";
                 }
+                data += "Z";
 
                 svgPath.setAttribute("data-facetId", f.id + "");
                 // Set path's data
@@ -329,6 +331,29 @@ export class GUIProcessManager {
                 }
 
                 svg.appendChild(svgPath);
+
+                for (const seg of f.borderSegments) {
+                    const svgSegPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                    let segData = "M ";
+                    const segPoints = seg.originalSegment.points;
+                    segData += segPoints[0].x * sizeMultiplier + " " + segPoints[0].y * sizeMultiplier + " ";
+                    for (let i: number = 1; i < segPoints.length; i++) {
+                        const midpointX = (segPoints[i].x + segPoints[i - 1].x) / 2;
+                        const midpointY = (segPoints[i].y + segPoints[i - 1].y) / 2;
+                        //data += "Q " + (midpointX * sizeMultiplier) + " " + (midpointY * sizeMultiplier) + " " + (newpath[i].x * sizeMultiplier) + " " + (newpath[i].y * sizeMultiplier) + " ";
+                        segData += "L " + (segPoints[i].x * sizeMultiplier) + " " + (segPoints[i].y * sizeMultiplier) + " ";
+                    }
+
+                    console.log("Facet " + f.id + ", segment " + segPoints[0].x + "," + segPoints[0].y + " -> " + segPoints[segPoints.length-1].x + "," +  segPoints[segPoints.length-1].y);
+
+                    svgSegPath.setAttribute("data-segmentFacet", f.id + "");
+                    // Set path's data
+                    svgSegPath.setAttribute("d", segData);
+                    svgSegPath.style.stroke = "#FF0";
+                    svgSegPath.style.fill = "none";
+                    svg.appendChild(svgSegPath);
+                }
+                
 
                 // add the color labels if necessary. I mean, this is the whole idea behind the paint by numbers part
                 // so I don't know why you would hide them
