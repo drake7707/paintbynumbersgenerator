@@ -282,9 +282,14 @@ export class GUIProcessManager {
                 const useSegments = true;
                 if (useSegments) {
                     newpath = f.getFullPathFromBorderSegments();
+                    // shift from wall coordinates to pixel centers
+                    for (const p of newpath) {
+                        p.x+=0.5;
+                        p.y+=0.5;
+                    }
                 } else {
                     for (let i: number = 0; i < f.borderPath.length; i++) {
-                        newpath.push(new Point(f.borderPath[i].getWallX(), f.borderPath[i].getWallY()));
+                        newpath.push(new Point(f.borderPath[i].getWallX()+0.5, f.borderPath[i].getWallY()+0.5));
                     }
                 }
                 if (newpath[0].x !== newpath[newpath.length - 1].x || newpath[0].y !== newpath[newpath.length - 1].y) {
