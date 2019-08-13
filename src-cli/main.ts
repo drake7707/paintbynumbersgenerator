@@ -144,12 +144,12 @@ async function main() {
         }
     }
 
-    const colorAliasesByColor:{ [key:string]:string } = {};
+    const colorAliasesByColor: { [key: string]: string } = {};
     for (const alias of Object.keys(settings.colorAliases)) {
         colorAliasesByColor[settings.colorAliases[alias].join(",")] = alias;
     }
 
-    const totalFrequency = colorFrequency.reduce((sum,val) => sum+val);
+    const totalFrequency = colorFrequency.reduce((sum, val) => sum + val);
 
     const paletteInfo = JSON.stringify(colormapResult.colorsByIndex.map((color, index) => {
         return {
@@ -157,7 +157,7 @@ async function main() {
             color: color,
             colorAlias: colorAliasesByColor[color.join(",")],
             frequency: colorFrequency[index],
-            areaPercentage:  colorFrequency[index] / totalFrequency
+            areaPercentage: colorFrequency[index] / totalFrequency
         };
     }), null, 2);
 
@@ -180,15 +180,10 @@ async function createSVG(facetResult: FacetResult, colorsByIndex: RGB[], sizeMul
             let newpath: Point[] = [];
             const useSegments = true;
             if (useSegments) {
-                newpath = f.getFullPathFromBorderSegments(true);
-                // shift from wall coordinates to pixel centers
-                for (const p of newpath) {
-                    p.x+=0.5;
-                    p.y+=0.5;
-                }
+                newpath = f.getFullPathFromBorderSegments(false);
             } else {
                 for (let i: number = 0; i < f.borderPath.length; i++) {
-                    newpath.push(new Point(f.borderPath[i].getWallX()+0.5, f.borderPath[i].getWallY()+0.5));
+                    newpath.push(new Point(f.borderPath[i].getWallX() + 0.5, f.borderPath[i].getWallY() + 0.5));
                 }
             }
             if (newpath[0].x !== newpath[newpath.length - 1].x || newpath[0].y !== newpath[newpath.length - 1].y) {
@@ -256,9 +251,11 @@ async function createSVG(facetResult: FacetResult, colorsByIndex: RGB[], sizeMul
                 //         <text font-family="Tahoma" font-size="60" dominant-baseline="middle" text-anchor="middle">${f.color}</text>
                 //     </svg>
                 //    </g>`;
+
+                const nrOfDigits = (f.color + "").length;
                 const svgLabelString = `<g class="label" transform="translate(${labelOffsetX},${labelOffsetY})">
                                         <svg width="${labelWidth}" height="${labelHeight}" overflow="visible" viewBox="-50 -50 100 100" preserveAspectRatio="xMidYMid meet">
-                                            <text font-family="Tahoma" font-size="${fontSize}" dominant-baseline="middle" text-anchor="middle" fill="${fontColor}">${f.color}</text>
+                                            <text font-family="Tahoma" font-size="${(fontSize / nrOfDigits)}" dominant-baseline="middle" text-anchor="middle" fill="${fontColor}">${f.color}</text>
                                         </svg>
                                        </g>`;
 

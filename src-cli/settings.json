@@ -4,8 +4,7 @@
     "kMeansClusteringColorSpace": 0,
 
     "kMeansColorRestrictions": [
-        "A1", "A2", "A3", "B1", "B2", "B3",
-        [ 255, 255, 255 ]
+       
     ],
     "colorAliases": {
         "A1": [0,0,0],
