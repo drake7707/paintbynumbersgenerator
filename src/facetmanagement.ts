@@ -1216,7 +1216,7 @@ export class FacetBorderSegmenter {
             if (f != null) {
                 for (const segment of segmentsPerFacet[f.id]) {
                     for (let i: number = 0; i < nrOfTimesToHalvePoints; i++) {
-                        segment!.points = FacetBorderSegmenter.reduceSegmentHaarWavelet(segment!.points);
+                        segment!.points = FacetBorderSegmenter.reduceSegmentHaarWavelet(segment!.points, true, facetResult.width, facetResult.height);
                     }
                 }
             }
@@ -1228,7 +1228,7 @@ export class FacetBorderSegmenter {
      *  in the reduced segment. The delta values that create the Haar wavelet are not tracked
      *  because they are unneeded.
      */
-    private static reduceSegmentHaarWavelet(newpath: PathPoint[]) {
+    private static reduceSegmentHaarWavelet(newpath: PathPoint[], skipOutsideBorders: boolean, width: number, height: number) {
         if (newpath.length <= 5) {
             return newpath;
         }
@@ -1236,15 +1236,41 @@ export class FacetBorderSegmenter {
         const reducedPath: PathPoint[] = [];
         reducedPath.push(newpath[0]);
         for (let i: number = 1; i < newpath.length - 2; i += 2) {
-            const cx = (newpath[i].x + newpath[i + 1].x) / 2;
-            const cy = (newpath[i].y + newpath[i + 1].y) / 2;
-            reducedPath.push(new PathPoint(new Point(cx, cy), OrientationEnum.Left));
+
+            if (!skipOutsideBorders || (skipOutsideBorders && !FacetBorderSegmenter.isOutsideBorderPoint(newpath[i], width, height))) {
+                const cx = (newpath[i].x + newpath[i + 1].x) / 2;
+                const cy = (newpath[i].y + newpath[i + 1].y) / 2;
+                reducedPath.push(new PathPoint(new Point(cx, cy), OrientationEnum.Left));
+            } else {
+                reducedPath.push(newpath[i]);
+                reducedPath.push(newpath[i+1]);
+            }
         }
 
         // close the loop
         reducedPath.push(newpath[newpath.length - 1]);
 
         return reducedPath;
+    }
+
+    private static isOutsideBorderPoint(point: Point, width: number, height: number) {
+        return point.x === 0 || point.y === 0 || point.x === width - 1 || point.y === height - 1;
+    }
+
+    private static calculateArea(path: Point[]) {
+
+        let total = 0;
+        for (let i = 0; i < path.length; i++) {
+            const addX = path[i].x;
+            const addY = path[i === path.length - 1 ? 0 : i + 1].y;
+            const subX = path[i === path.length - 1 ? 0 : i + 1].x;
+            const subY = path[i].y;
+
+            total += (addX * addY * 0.5);
+            total -= (subX * subY * 0.5);
+        }
+
+        return Math.abs(total);
     }
 
     /**

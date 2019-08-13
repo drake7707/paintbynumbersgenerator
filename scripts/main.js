@@ -2195,7 +2195,7 @@ define("facetmanagement", ["require", "exports", "common", "lib/fill", "lib/poly
                 if (f != null) {
                     for (const segment of segmentsPerFacet[f.id]) {
                         for (let i = 0; i < nrOfTimesToHalvePoints; i++) {
-                            segment.points = FacetBorderSegmenter.reduceSegmentHaarWavelet(segment.points);
+                            segment.points = FacetBorderSegmenter.reduceSegmentHaarWavelet(segment.points, true, facetResult.width, facetResult.height);
                         }
                     }
                 }
@@ -2206,20 +2206,41 @@ define("facetmanagement", ["require", "exports", "common", "lib/fill", "lib/poly
          *  in the reduced segment. The delta values that create the Haar wavelet are not tracked
          *  because they are unneeded.
          */
-        static reduceSegmentHaarWavelet(newpath) {
+        static reduceSegmentHaarWavelet(newpath, skipOutsideBorders, width, height) {
             if (newpath.length <= 5) {
                 return newpath;
             }
             const reducedPath = [];
             reducedPath.push(newpath[0]);
             for (let i = 1; i < newpath.length - 2; i += 2) {
-                const cx = (newpath[i].x + newpath[i + 1].x) / 2;
-                const cy = (newpath[i].y + newpath[i + 1].y) / 2;
-                reducedPath.push(new PathPoint(new point_1.Point(cx, cy), OrientationEnum.Left));
+                if (!skipOutsideBorders || (skipOutsideBorders && !FacetBorderSegmenter.isOutsideBorderPoint(newpath[i], width, height))) {
+                    const cx = (newpath[i].x + newpath[i + 1].x) / 2;
+                    const cy = (newpath[i].y + newpath[i + 1].y) / 2;
+                    reducedPath.push(new PathPoint(new point_1.Point(cx, cy), OrientationEnum.Left));
+                }
+                else {
+                    reducedPath.push(newpath[i]);
+                    reducedPath.push(newpath[i + 1]);
+                }
             }
             // close the loop
             reducedPath.push(newpath[newpath.length - 1]);
             return reducedPath;
+        }
+        static isOutsideBorderPoint(point, width, height) {
+            return point.x === 0 || point.y === 0 || point.x === width - 1 || point.y === height - 1;
+        }
+        static calculateArea(path) {
+            let total = 0;
+            for (let i = 0; i < path.length; i++) {
+                const addX = path[i].x;
+                const addY = path[i === path.length - 1 ? 0 : i + 1].y;
+                const subX = path[i === path.length - 1 ? 0 : i + 1].x;
+                const subY = path[i].y;
+                total += (addX * addY * 0.5);
+                total -= (subX * subY * 0.5);
+            }
+            return Math.abs(total);
         }
         /**
          *  Matches all segments with each other between facets and their neighbour
