@@ -2162,7 +2162,7 @@ define("facetmanagement", ["require", "exports", "common", "lib/fill", "lib/poly
                             if (isTransitionPoint) {
                                 // aha! a transition point, create the current points as new segment
                                 // and start a new list
-                                if (currentPoints.length > 0) {
+                                if (currentPoints.length > 1) {
                                     const segment = new PathSegment(currentPoints, oldNeighbour);
                                     segments.push(segment);
                                     currentPoints = [curBorderPoint];
@@ -2172,7 +2172,7 @@ define("facetmanagement", ["require", "exports", "common", "lib/fill", "lib/poly
                         // finally check if there is a remainder partial segment and either prepend
                         // the points to the first segment if they have the same neighbour or construct a
                         // new segment
-                        if (currentPoints.length > 0) {
+                        if (currentPoints.length > 1) {
                             const oldNeighbour = f.borderPath[f.borderPath.length - 1].getNeighbour(facetResult);
                             if (segments.length > 0 && segments[0].neighbour === oldNeighbour) {
                                 // the first segment and the remainder of the last one are the same part
