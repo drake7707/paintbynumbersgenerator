@@ -19,6 +19,8 @@
     "removeFacetsFromLargeToSmall": true,
     "nrOfTimesToHalveBorderSegments": 2,
     
+    "narrowPixelStripCleanupRuns": 3,
+    
     "resizeImageIfTooLarge": true,
     "resizeImageWidth": 1024,
     "resizeImageHeight": 1024,

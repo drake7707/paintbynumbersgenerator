@@ -10,6 +10,8 @@ import { Uint8Array2D } from "./structs/typedarrays";
 export class ColorMapResult {
     public imgColorIndices!: Uint8Array2D;
     public colorsByIndex!: RGB[];
+    public width!: number;
+    public height!: number;
 }
 
 export class ColorReducer {
@@ -47,6 +49,9 @@ export class ColorReducer {
         const result = new ColorMapResult();
         result.imgColorIndices = imgColorIndices;
         result.colorsByIndex = colorsByIndex;
+        result.width = kmeansImgData.width;
+        result.height = kmeansImgData.height;
+
         return result;
     }
 
@@ -103,8 +108,8 @@ export class ColorReducer {
             // determine the weight (#pointsOfColor / #totalpoints) of each color
             const weight = pointsByColor[color].length / (imgData.width * imgData.height);
 
-            const v = new Vector(data, weight);
-            vectors[vIdx++] = v;
+            const vec = new Vector(data, weight);
+            vectors[vIdx++] = vec;
         }
 
         // vectors of all the unique colors are built, time to cluster them
@@ -210,5 +215,60 @@ export class ColorReducer {
                 }
             }
         }
+    }
+
+    /**
+     *  Builds a distance matrix for each color to each other
+     */
+    public static buildColorDistanceMatrix(colorsByIndex: RGB[]) {
+        const colorDistances: number[][] = new Array(colorsByIndex.length);
+        for (let j: number = 0; j < colorsByIndex.length; j++) {
+            colorDistances[j] = new Array(colorDistances.length);
+        }
+        for (let j: number = 0; j < colorsByIndex.length; j++) {
+            for (let i: number = j; i < colorsByIndex.length; i++) {
+                const c1 = colorsByIndex[j];
+                const c2 = colorsByIndex[i];
+                const distance = Math.sqrt((c1[0] - c2[0]) * (c1[0] - c2[0]) +
+                    (c1[1] - c2[1]) * (c1[1] - c2[1]) +
+                    (c1[2] - c2[2]) * (c1[2] - c2[2]));
+                colorDistances[i][j] = distance;
+                colorDistances[j][i] = distance;
+            }
+        }
+        return colorDistances;
+    }
+
+    public static async processNarrowPixelStripCleanup(colormapResult: ColorMapResult) {
+        // build the color distance matrix, which describes the distance of each color to each other
+        const colorDistances: number[][] = ColorReducer.buildColorDistanceMatrix(colormapResult.colorsByIndex);
+
+        let count = 0;
+        const imgColorIndices = colormapResult.imgColorIndices;
+        for (let j: number = 1; j < colormapResult.height - 1; j++) {
+            for (let i: number = 1; i < colormapResult.width - 1; i++) {
+                const top = imgColorIndices.get(i, j - 1);
+                const bottom = imgColorIndices.get(i, j + 1);
+                const left = imgColorIndices.get(i - 1, j);
+                const right = imgColorIndices.get(i + 1, j);
+                const cur = imgColorIndices.get(i, j);
+                if (cur !== top && cur !== bottom && cur !== left && cur !== right) {
+                    // single pixel
+                } else if (cur !== top && cur !== bottom) {
+                    // check the color distance whether the top or bottom color is closer
+                    const topColorDistance = colorDistances[cur][top];
+                    const bottomColorDistance = colorDistances[cur][bottom];
+                    imgColorIndices.set(i, j, topColorDistance < bottomColorDistance ? top : bottom);
+                    count++;
+                } else if (cur !== left && cur !== right) {
+                    // check the color distance whether the top or bottom color is closer
+                    const leftColorDistance = colorDistances[cur][left];
+                    const rightColorDistance = colorDistances[cur][right];
+                    imgColorIndices.set(i, j, leftColorDistance < rightColorDistance ? left : right);
+                    count++;
+                }
+            }
+        }
+        console.log(count + " pixels replaced to remove narrow pixel strips");
     }
 }

@@ -64,14 +64,33 @@ export class GUIProcessManager {
         // k-means clustering
         const kmeansImgData = await GUIProcessManager.processKmeansClustering(imgData, tabsOutput, ctx, settings, cancellationToken);
 
+        let facetResult: FacetResult = new FacetResult();
+        let colormapResult: ColorMapResult = new ColorMapResult();
+
         // build color map
-        const colormapResult = ColorReducer.createColorMap(kmeansImgData);
+        colormapResult = ColorReducer.createColorMap(kmeansImgData);
 
-        // facet building
-        const facetResult = await GUIProcessManager.processFacetBuilding(imgData, colormapResult, cancellationToken);
+        if (settings.narrowPixelStripCleanupRuns === 0) {
+            // facet building
+            facetResult = await GUIProcessManager.processFacetBuilding(colormapResult, cancellationToken);
 
-        // facet reduction
-        await GUIProcessManager.processFacetReduction(facetResult, tabsOutput, settings, colormapResult, cancellationToken);
+            // facet reduction
+            await GUIProcessManager.processFacetReduction(facetResult, tabsOutput, settings, colormapResult, cancellationToken);
+        } else {
+            for (let run = 0; run < settings.narrowPixelStripCleanupRuns; run++) {
+
+                // clean up narrow pixel strips
+                await ColorReducer.processNarrowPixelStripCleanup(colormapResult);
+
+                // facet building
+                facetResult = await GUIProcessManager.processFacetBuilding(colormapResult, cancellationToken);
+
+                // facet reduction
+                await GUIProcessManager.processFacetReduction(facetResult, tabsOutput, settings, colormapResult, cancellationToken);
+
+                // the colormapResult.imgColorIndices get updated as the facets are reduced, so just do a few runs of pixel cleanup
+            }
+        }
 
         // facet border tracing
         await GUIProcessManager.processFacetBorderTracing(tabsOutput, facetResult, cancellationToken);
@@ -90,7 +109,7 @@ export class GUIProcessManager {
     }
 
     private static async processKmeansClustering(imgData: ImageData, tabsOutput: M.Tabs, ctx: CanvasRenderingContext2D,
-                                                 settings: Settings, cancellationToken: CancellationToken) {
+        settings: Settings, cancellationToken: CancellationToken) {
         time("K-means clustering");
 
         const cKmeans = document.getElementById("cKMeans") as HTMLCanvasElement;
@@ -122,10 +141,11 @@ export class GUIProcessManager {
         return kmeansImgData;
     }
 
-    private static async  processFacetBuilding(imgData: ImageData, colormapResult: ColorMapResult, cancellationToken: CancellationToken) {
+
+    private static async  processFacetBuilding(colormapResult: ColorMapResult, cancellationToken: CancellationToken) {
         time("Facet building");
         $(".status.facetBuilding").addClass("active");
-        const facetResult = await FacetCreator.getFacets(imgData.width, imgData.height, colormapResult.imgColorIndices, (progress) => {
+        const facetResult = await FacetCreator.getFacets(colormapResult.width, colormapResult.height, colormapResult.imgColorIndices, (progress) => {
             if (cancellationToken.isCancelled) {
                 throw new Error("Cancelled");
             }

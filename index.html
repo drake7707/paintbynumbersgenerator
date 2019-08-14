@@ -129,7 +129,15 @@
                     </li>
                     <li class="collection-item">
                         <div class="row">
-                            <div class="input-field col s12">
+                            <div class="input-field col s6">
+                                <input id="txtNarrowPixelStripCleanupRuns" type="number" value="3" min="0"
+                                    class="validate">
+                                <label for="txtNarrowPixelStripCleanupRuns">Number of runs for narrow pixel cleanup
+                                    <i class="material-icons tooltipped"
+                                        data-tooltip="Narrow pixel cleanup removes strips of single pixel rows, which would make some facets have some borders segments that are way too narrow to be useful. The small facet removal can introduce new narrow pixel strips, so this is repeated in a few iterative runs.">info</i>
+                                </label>
+                            </div>
+                            <div class="input-field col s6">
                                 <input id="txtRemoveFacetsSmallerThan" type="number" value="20" min="1"
                                     class="validate">
                                 <label for="txtRemoveFacetsSmallerThan">Remove small facets smaller than (pixels)
@@ -137,6 +145,8 @@
                                         data-tooltip="Removes any facets that are smaller than the given amount of pixels. Lowering the value will create more detailed results but might be much harder to actually paint due to their size.">info</i>
                                 </label>
                             </div>
+                        </div>
+                        <div class="row">
                             <div class="input-field col s6">
                                 <div class="row">
                                     <div class="col s4">

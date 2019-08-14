@@ -99,15 +99,36 @@ async function main() {
 
     const colormapResult = ColorReducer.createColorMap(kmeansImgData);
 
-    console.log("Creating facets");
-    const facetResult = await FacetCreator.getFacets(imgData.width, imgData.height, colormapResult.imgColorIndices, (progress) => {
-        // progress
-    });
+    let facetResult = new FacetResult();
+    if (typeof settings.narrowPixelStripCleanupRuns === "undefined" || settings.narrowPixelStripCleanupRuns === 0) {
+        console.log("Creating facets");
+        facetResult = await FacetCreator.getFacets(imgData.width, imgData.height, colormapResult.imgColorIndices, (progress) => {
+            // progress
+        });
 
-    console.log("Reducing facets");
-    await FacetReducer.reduceFacets(settings.removeFacetsSmallerThanNrOfPoints, settings.removeFacetsFromLargeToSmall, colormapResult.colorsByIndex, facetResult, colormapResult.imgColorIndices, (progress) => {
-        // progress
-    });
+        console.log("Reducing facets");
+        await FacetReducer.reduceFacets(settings.removeFacetsSmallerThanNrOfPoints, settings.removeFacetsFromLargeToSmall, colormapResult.colorsByIndex, facetResult, colormapResult.imgColorIndices, (progress) => {
+            // progress
+        });
+    } else {
+        for (let run = 0; run < settings.narrowPixelStripCleanupRuns; run++) {
+            console.log("Removing narrow pixels run #" + (run+1));
+            // clean up narrow pixel strips
+            await ColorReducer.processNarrowPixelStripCleanup(colormapResult);
+
+            console.log("Creating facets");
+            facetResult = await FacetCreator.getFacets(imgData.width, imgData.height, colormapResult.imgColorIndices, (progress) => {
+                // progress
+            });
+
+            console.log("Reducing facets");
+            await FacetReducer.reduceFacets(settings.removeFacetsSmallerThanNrOfPoints, settings.removeFacetsFromLargeToSmall, colormapResult.colorsByIndex, facetResult, colormapResult.imgColorIndices, (progress) => {
+                // progress
+            });
+
+            // the colormapResult.imgColorIndices get updated as the facets are reduced, so just do a few runs of pixel cleanup
+        }
+    }
 
     console.log("Build border paths");
     await FacetBorderTracer.buildFacetBorderPaths(facetResult, (progress) => {

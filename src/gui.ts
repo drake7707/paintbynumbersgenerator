@@ -52,6 +52,8 @@ export function parseSettings(): Settings {
 
     settings.nrOfTimesToHalveBorderSegments = parseInt($("#txtNrOfTimesToHalveBorderSegments").val() + "");
 
+    settings.narrowPixelStripCleanupRuns = parseInt($("#txtNarrowPixelStripCleanupRuns").val() + "");
+    
     settings.resizeImageIfTooLarge = $("#chkResizeImage").prop("checked");
     settings.resizeImageWidth = parseInt($("#txtResizeWidth").val() + "");
     settings.resizeImageHeight = parseInt($("#txtResizeHeight").val() + "");
