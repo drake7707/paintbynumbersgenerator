@@ -27,6 +27,1040 @@ define("common", ["require", "exports"], function (require, exports) {
     }
     exports.CancellationToken = CancellationToken;
 });
+// Faster flood fill from
+// http://www.adammil.net/blog/v126_A_More_Efficient_Flood_Fill.html
+define("lib/fill", ["require", "exports"], function (require, exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    function fill(x, y, width, height, visited, setFill) {
+        // at this point, we know array[y,x] is clear, and we want to move as far as possible to the upper-left. moving
+        // up is much more important than moving left, so we could try to make this smarter by sometimes moving to
+        // the right if doing so would allow us to move further up, but it doesn't seem worth the complexit
+        let xx = x;
+        let yy = y;
+        while (true) {
+            const ox = xx;
+            const oy = yy;
+            while (yy !== 0 && !visited(xx, yy - 1)) {
+                yy--;
+            }
+            while (xx !== 0 && !visited(xx - 1, yy)) {
+                xx--;
+            }
+            if (xx === ox && yy === oy) {
+                break;
+            }
+        }
+        fillCore(xx, yy, width, height, visited, setFill);
+    }
+    exports.fill = fill;
+    function fillCore(x, y, width, height, visited, setFill) {
+        // at this point, we know that array[y,x] is clear, and array[y-1,x] and array[y,x-1] are set.
+        // we'll begin scanning down and to the right, attempting to fill an entire rectangular block
+        let lastRowLength = 0; // the number of cells that were clear in the last row we scanned
+        do {
+            let rowLength = 0;
+            let sx = x; // keep track of how long this row is. sx is the starting x for the main scan below
+            // now we want to handle a case like |***|, where we fill 3 cells in the first row and then after we move to
+            // the second row we find the first  | **| cell is filled, ending our rectangular scan. rather than handling
+            // this via the recursion below, we'll increase the starting value of 'x' and reduce the last row length to
+            // match. then we'll continue trying to set the narrower rectangular block
+            if (lastRowLength !== 0 && visited(x, y)) {
+                do {
+                    if (--lastRowLength === 0) {
+                        return;
+                    } // shorten the row. if it's full, we're done
+                } while (visited(++x, y)); // otherwise, update the starting point of the main scan to match
+                sx = x;
+            }
+            else {
+                for (; x !== 0 && !visited(x - 1, y); rowLength++, lastRowLength++) {
+                    x--;
+                    setFill(x, y); // to avoid scanning the cells twice, we'll fill them and update rowLength here
+                    // if there's something above the new starting point, handle that recursively. this deals with cases
+                    // like |* **| when we begin filling from (2,0), move down to (2,1), and then move left to (0,1).
+                    // the  |****| main scan assumes the portion of the previous row from x to x+lastRowLength has already
+                    // been filled. adjusting x and lastRowLength breaks that assumption in this case, so we must fix it
+                    if (y !== 0 && !visited(x, y - 1)) {
+                        fill(x, y - 1, width, height, visited, setFill);
+                    } // use _Fill since there may be more up and left
+                }
+            }
+            // now at this point we can begin to scan the current row in the rectangular block. the span of the previous
+            // row from x (inclusive) to x+lastRowLength (exclusive) has already been filled, so we don't need to
+            // check it. so scan across to the right in the current row
+            for (; sx < width && !visited(sx, y); rowLength++, sx++) {
+                setFill(sx, y);
+            }
+            // now we've scanned this row. if the block is rectangular, then the previous row has already been scanned,
+            // so we don't need to look upwards and we're going to scan the next row in the next iteration so we don't
+            // need to look downwards. however, if the block is not rectangular, we may need to look upwards or rightwards
+            // for some portion of the row. if this row was shorter than the last row, we may need to look rightwards near
+            // the end, as in the case of |*****|, where the first row is 5 cells long and the second row is 3 cells long.
+            // we must look to the right  |*** *| of the single cell at the end of the second row, i.e. at (4,1)
+            if (rowLength < lastRowLength) {
+                for (const end = x + lastRowLength; ++sx < end;) { // there. any clear cells would have been connected to the previous
+                    if (!visited(sx, y)) {
+                        fillCore(sx, y, width, height, visited, setFill);
+                    } // row. the cells up and left must be set so use FillCore
+                }
+            }
+            else if (rowLength > lastRowLength && y !== 0) {
+                for (let ux = x + lastRowLength; ++ux < sx;) {
+                    if (!visited(ux, y - 1)) {
+                        fill(ux, y - 1, width, height, visited, setFill);
+                    } // since there may be clear cells up and left, use _Fill
+                }
+            }
+            lastRowLength = rowLength; // record the new row length
+        } while (lastRowLength !== 0 && ++y < height); // if we get to a full row or to the bottom, we're done
+    }
+});
+define("structs/boundingbox", ["require", "exports"], function (require, exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    class BoundingBox {
+        constructor() {
+            this.minX = Number.MAX_VALUE;
+            this.minY = Number.MAX_VALUE;
+            this.maxX = Number.MIN_VALUE;
+            this.maxY = Number.MIN_VALUE;
+        }
+        get width() {
+            return this.maxX - this.minX + 1;
+        }
+        get height() {
+            return this.maxY - this.minY + 1;
+        }
+    }
+    exports.BoundingBox = BoundingBox;
+});
+define("structs/point", ["require", "exports"], function (require, exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    class Point {
+        constructor(x, y) {
+            this.x = x;
+            this.y = y;
+        }
+        distanceTo(pt) {
+            // don't do euclidean because then neighbours should be diagonally as well
+            // because sqrt(2) < 2
+            //  return Math.sqrt((pt.x - this.x) * (pt.x - this.x) + (pt.y - this.y) * (pt.y - this.y));
+            return Math.abs(pt.x - this.x) + Math.abs(pt.y - this.y);
+        }
+        distanceToCoord(x, y) {
+            // don't do euclidean because then neighbours should be diagonally as well
+            // because sqrt(2) < 2
+            //  return Math.sqrt((pt.x - this.x) * (pt.x - this.x) + (pt.y - this.y) * (pt.y - this.y));
+            return Math.abs(x - this.x) + Math.abs(y - this.y);
+        }
+    }
+    exports.Point = Point;
+});
+define("structs/typedarrays", ["require", "exports"], function (require, exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    class Uint32Array2D {
+        constructor(width, height) {
+            this.width = width;
+            this.height = height;
+            this.arr = new Uint32Array(width * height);
+        }
+        get(x, y) {
+            return this.arr[y * this.width + x];
+        }
+        set(x, y, value) {
+            this.arr[y * this.width + x] = value;
+        }
+    }
+    exports.Uint32Array2D = Uint32Array2D;
+    class Uint8Array2D {
+        constructor(width, height) {
+            this.width = width;
+            this.height = height;
+            this.arr = new Uint8Array(width * height);
+        }
+        get(x, y) {
+            return this.arr[y * this.width + x];
+        }
+        set(x, y, value) {
+            this.arr[y * this.width + x] = value;
+        }
+        matchAllAround(x, y, value) {
+            const idx = y * this.width + x;
+            return (x - 1 >= 0 && this.arr[idx - 1] === value) &&
+                (y - 1 >= 0 && this.arr[idx - this.width] === value) &&
+                (x + 1 < this.width && this.arr[idx + 1] === value) &&
+                (y + 1 < this.height && this.arr[idx + this.width] === value);
+        }
+    }
+    exports.Uint8Array2D = Uint8Array2D;
+    class BooleanArray2D {
+        constructor(width, height) {
+            this.width = width;
+            this.height = height;
+            this.arr = new Uint8Array(width * height);
+        }
+        get(x, y) {
+            return this.arr[y * this.width + x] !== 0;
+        }
+        set(x, y, value) {
+            this.arr[y * this.width + x] = value ? 1 : 0;
+        }
+    }
+    exports.BooleanArray2D = BooleanArray2D;
+});
+define("FacetBorderSegmenter", ["require", "exports", "common", "structs/point", "facetmanagement"], function (require, exports, common_1, point_1, facetmanagement_1) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    /**
+     *  Path segment is a segment of a border path that is adjacent to a specific neighbour facet
+     */
+    class PathSegment {
+        constructor(points, neighbour) {
+            this.points = points;
+            this.neighbour = neighbour;
+        }
+    }
+    exports.PathSegment = PathSegment;
+    /**
+     * Facet boundary segment describes the matched segment that is shared between 2 facets
+     * When 2 segments are matched, one will be the original segment and the other one is removed
+     * This ensures that all facets share the same segments, but sometimes in reverse order to ensure
+     * the correct continuity of its entire oborder path
+     */
+    class FacetBoundarySegment {
+        constructor(originalSegment, neighbour, reverseOrder) {
+            this.originalSegment = originalSegment;
+            this.neighbour = neighbour;
+            this.reverseOrder = reverseOrder;
+        }
+    }
+    exports.FacetBoundarySegment = FacetBoundarySegment;
+    class FacetBorderSegmenter {
+        /**
+         *  Builds border segments that are shared between facets
+         *  While border paths are all nice and fancy, they are not linked to neighbour facets
+         *  So any change in the paths makes a not so nice gap between the facets, which makes smoothing them out impossible
+         */
+        static buildFacetBorderSegments(facetResult, nrOfTimesToHalvePoints = 2, onUpdate = null) {
+            return __awaiter(this, void 0, void 0, function* () {
+                // first chop up the border path in segments each time the neighbour at that point changes
+                // (and sometimes even when it doesn't on that side but does on the neighbour's side)
+                const segmentsPerFacet = FacetBorderSegmenter.prepareSegmentsPerFacet(facetResult);
+                // now reduce the segment complexity with Haar wavelet reduction to smooth them out and make them
+                // more curvy with data points instead of zig zag of a grid
+                FacetBorderSegmenter.reduceSegmentComplexity(facetResult, segmentsPerFacet, nrOfTimesToHalvePoints);
+                // now see which segments of facets with the prepared segments of the neighbour facets
+                // and point them to the same one
+                yield FacetBorderSegmenter.matchSegmentsWithNeighbours(facetResult, segmentsPerFacet, onUpdate);
+            });
+        }
+        /**
+         *  Chops up the border paths per facet into segments adjacent tothe same neighbour
+         */
+        static prepareSegmentsPerFacet(facetResult) {
+            const segmentsPerFacet = new Array(facetResult.facets.length);
+            for (const f of facetResult.facets) {
+                if (f != null) {
+                    const segments = [];
+                    if (f.borderPath.length > 1) {
+                        let currentPoints = [];
+                        currentPoints.push(f.borderPath[0]);
+                        for (let i = 1; i < f.borderPath.length; i++) {
+                            const prevBorderPoint = f.borderPath[i - 1];
+                            const curBorderPoint = f.borderPath[i];
+                            const oldNeighbour = prevBorderPoint.getNeighbour(facetResult);
+                            const curNeighbour = curBorderPoint.getNeighbour(facetResult);
+                            let isTransitionPoint = false;
+                            if (oldNeighbour !== curNeighbour) {
+                                isTransitionPoint = true;
+                            }
+                            else {
+                                // it's possible that due to inner facets inside the current facet that the
+                                // border is interrupted on that facet's side, but not on the neighbour's side
+                                if (oldNeighbour !== -1) {
+                                    // check for tight rotations to break path if diagonals contain a different neighbour,
+                                    // see https://i.imgur.com/o6Srqwj.png for visual path of the issue
+                                    if (prevBorderPoint.x === curBorderPoint.x &&
+                                        prevBorderPoint.y === curBorderPoint.y) {
+                                        // rotation turn
+                                        // check the diagonal neighbour to see if it remains the same
+                                        //   +---+---+
+                                        //   | dN|   |
+                                        //   +---xxxx> (x = wall, dN = diagNeighbour)
+                                        //   |   x f |
+                                        //   +---v---+
+                                        if ((prevBorderPoint.orientation === facetmanagement_1.OrientationEnum.Top && curBorderPoint.orientation === facetmanagement_1.OrientationEnum.Left) ||
+                                            (prevBorderPoint.orientation === facetmanagement_1.OrientationEnum.Left && curBorderPoint.orientation === facetmanagement_1.OrientationEnum.Top)) {
+                                            const diagNeighbour = facetResult.facetMap.get(curBorderPoint.x - 1, curBorderPoint.y - 1);
+                                            if (diagNeighbour !== oldNeighbour) {
+                                                isTransitionPoint = true;
+                                            }
+                                        }
+                                        else if ((prevBorderPoint.orientation === facetmanagement_1.OrientationEnum.Top && curBorderPoint.orientation === facetmanagement_1.OrientationEnum.Right) ||
+                                            (prevBorderPoint.orientation === facetmanagement_1.OrientationEnum.Right && curBorderPoint.orientation === facetmanagement_1.OrientationEnum.Top)) {
+                                            const diagNeighbour = facetResult.facetMap.get(curBorderPoint.x + 1, curBorderPoint.y - 1);
+                                            if (diagNeighbour !== oldNeighbour) {
+                                                isTransitionPoint = true;
+                                            }
+                                        }
+                                        else if ((prevBorderPoint.orientation === facetmanagement_1.OrientationEnum.Bottom && curBorderPoint.orientation === facetmanagement_1.OrientationEnum.Left) ||
+                                            (prevBorderPoint.orientation === facetmanagement_1.OrientationEnum.Left && curBorderPoint.orientation === facetmanagement_1.OrientationEnum.Bottom)) {
+                                            const diagNeighbour = facetResult.facetMap.get(curBorderPoint.x - 1, curBorderPoint.y + 1);
+                                            if (diagNeighbour !== oldNeighbour) {
+                                                isTransitionPoint = true;
+                                            }
+                                        }
+                                        else if ((prevBorderPoint.orientation === facetmanagement_1.OrientationEnum.Bottom && curBorderPoint.orientation === facetmanagement_1.OrientationEnum.Right) ||
+                                            (prevBorderPoint.orientation === facetmanagement_1.OrientationEnum.Right && curBorderPoint.orientation === facetmanagement_1.OrientationEnum.Bottom)) {
+                                            const diagNeighbour = facetResult.facetMap.get(curBorderPoint.x + 1, curBorderPoint.y + 1);
+                                            if (diagNeighbour !== oldNeighbour) {
+                                                isTransitionPoint = true;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            currentPoints.push(curBorderPoint);
+                            if (isTransitionPoint) {
+                                // aha! a transition point, create the current points as new segment
+                                // and start a new list
+                                if (currentPoints.length > 1) {
+                                    const segment = new PathSegment(currentPoints, oldNeighbour);
+                                    segments.push(segment);
+                                    currentPoints = [curBorderPoint];
+                                }
+                            }
+                        }
+                        // finally check if there is a remainder partial segment and either prepend
+                        // the points to the first segment if they have the same neighbour or construct a
+                        // new segment
+                        if (currentPoints.length > 1) {
+                            const oldNeighbour = f.borderPath[f.borderPath.length - 1].getNeighbour(facetResult);
+                            if (segments.length > 0 && segments[0].neighbour === oldNeighbour) {
+                                // the first segment and the remainder of the last one are the same part
+                                // add the current points to the first segment by prefixing it
+                                const mergedPoints = currentPoints.concat(segments[0].points);
+                                segments[0].points = mergedPoints;
+                            }
+                            else {
+                                // add the remainder as final segment
+                                const segment = new PathSegment(currentPoints, oldNeighbour);
+                                segments.push(segment);
+                                currentPoints = [];
+                            }
+                        }
+                    }
+                    segmentsPerFacet[f.id] = segments;
+                }
+            }
+            return segmentsPerFacet;
+        }
+        /**
+         * Reduces each segment border path points
+         */
+        static reduceSegmentComplexity(facetResult, segmentsPerFacet, nrOfTimesToHalvePoints) {
+            for (const f of facetResult.facets) {
+                if (f != null) {
+                    for (const segment of segmentsPerFacet[f.id]) {
+                        for (let i = 0; i < nrOfTimesToHalvePoints; i++) {
+                            segment.points = FacetBorderSegmenter.reduceSegmentHaarWavelet(segment.points, true, facetResult.width, facetResult.height);
+                        }
+                    }
+                }
+            }
+        }
+        /**
+         *  Remove the points by taking the average per pair and using that as a new point
+         *  in the reduced segment. The delta values that create the Haar wavelet are not tracked
+         *  because they are unneeded.
+         */
+        static reduceSegmentHaarWavelet(newpath, skipOutsideBorders, width, height) {
+            if (newpath.length <= 5) {
+                return newpath;
+            }
+            const reducedPath = [];
+            reducedPath.push(newpath[0]);
+            for (let i = 1; i < newpath.length - 2; i += 2) {
+                if (!skipOutsideBorders || (skipOutsideBorders && !FacetBorderSegmenter.isOutsideBorderPoint(newpath[i], width, height))) {
+                    const cx = (newpath[i].x + newpath[i + 1].x) / 2;
+                    const cy = (newpath[i].y + newpath[i + 1].y) / 2;
+                    reducedPath.push(new facetmanagement_1.PathPoint(new point_1.Point(cx, cy), facetmanagement_1.OrientationEnum.Left));
+                }
+                else {
+                    reducedPath.push(newpath[i]);
+                    reducedPath.push(newpath[i + 1]);
+                }
+            }
+            // close the loop
+            reducedPath.push(newpath[newpath.length - 1]);
+            return reducedPath;
+        }
+        static isOutsideBorderPoint(point, width, height) {
+            return point.x === 0 || point.y === 0 || point.x === width - 1 || point.y === height - 1;
+        }
+        static calculateArea(path) {
+            let total = 0;
+            for (let i = 0; i < path.length; i++) {
+                const addX = path[i].x;
+                const addY = path[i === path.length - 1 ? 0 : i + 1].y;
+                const subX = path[i === path.length - 1 ? 0 : i + 1].x;
+                const subY = path[i].y;
+                total += (addX * addY * 0.5);
+                total -= (subX * subY * 0.5);
+            }
+            return Math.abs(total);
+        }
+        /**
+         *  Matches all segments with each other between facets and their neighbour
+         *  A segment matches when the start and end match or the start matches with the end and vice versa
+         *  (then the segment will need to be traversed in reverse order)
+         */
+        static matchSegmentsWithNeighbours(facetResult, segmentsPerFacet, onUpdate = null) {
+            return __awaiter(this, void 0, void 0, function* () {
+                // max distance of the start/end points of the segment that it can be before the segments don't match up
+                const MAX_DISTANCE = 4;
+                // reserve room
+                for (const f of facetResult.facets) {
+                    if (f != null) {
+                        f.borderSegments = new Array(segmentsPerFacet[f.id].length);
+                    }
+                }
+                let count = 0;
+                // and now the fun begins to match segments from 1 facet to its neighbours and vice versa
+                for (const f of facetResult.facets) {
+                    if (f != null) {
+                        const debug = false;
+                        for (let s = 0; s < segmentsPerFacet[f.id].length; s++) {
+                            const segment = segmentsPerFacet[f.id][s];
+                            if (segment != null && f.borderSegments[s] == null) {
+                                f.borderSegments[s] = new FacetBoundarySegment(segment, segment.neighbour, false);
+                                if (debug) {
+                                    console.log("Setting facet " + f.id + " segment " + s + " to " + f.borderSegments[s]);
+                                }
+                                if (segment.neighbour !== -1) {
+                                    const neighbourFacet = facetResult.facets[segment.neighbour];
+                                    // see if there is a match to be found
+                                    let matchFound = false;
+                                    if (neighbourFacet != null) {
+                                        const neighbourSegments = segmentsPerFacet[segment.neighbour];
+                                        for (let ns = 0; ns < neighbourSegments.length; ns++) {
+                                            const neighbourSegment = neighbourSegments[ns];
+                                            // only try to match against the segments that aren't processed yet
+                                            // and which are adjacent to the boundary of the current facet
+                                            if (neighbourSegment != null && neighbourSegment.neighbour === f.id) {
+                                                const segStartPoint = segment.points[0];
+                                                const segEndPoint = segment.points[segment.points.length - 1];
+                                                const nSegStartPoint = neighbourSegment.points[0];
+                                                const nSegEndPoint = neighbourSegment.points[neighbourSegment.points.length - 1];
+                                                let matchesStraight = (segStartPoint.distanceTo(nSegStartPoint) <= MAX_DISTANCE &&
+                                                    segEndPoint.distanceTo(nSegEndPoint) <= MAX_DISTANCE);
+                                                let matchesReverse = (segStartPoint.distanceTo(nSegEndPoint) <= MAX_DISTANCE &&
+                                                    segEndPoint.distanceTo(nSegStartPoint) <= MAX_DISTANCE);
+                                                if (matchesStraight && matchesReverse) {
+                                                    // dang it , both match, it must be a tiny segment, but when placed wrongly it'll overlap in the path creating an hourglass 
+                                                    //  e.g. https://i.imgur.com/XZQhxRV.png
+                                                    // determine which is the closest
+                                                    if (segStartPoint.distanceTo(nSegStartPoint) + segEndPoint.distanceTo(nSegEndPoint) <
+                                                        segStartPoint.distanceTo(nSegEndPoint) + segEndPoint.distanceTo(nSegStartPoint)) {
+                                                        matchesStraight = true;
+                                                        matchesReverse = false;
+                                                    }
+                                                    else {
+                                                        matchesStraight = false;
+                                                        matchesReverse = true;
+                                                    }
+                                                }
+                                                if (matchesStraight) {
+                                                    // start & end points match
+                                                    if (debug) {
+                                                        console.log("Match found for facet " + f.id + " to neighbour " + neighbourFacet.id);
+                                                    }
+                                                    neighbourFacet.borderSegments[ns] = new FacetBoundarySegment(segment, f.id, false);
+                                                    if (debug) {
+                                                        console.log("Setting facet " + neighbourFacet.id + " segment " + ns + " to " + neighbourFacet.borderSegments[ns]);
+                                                    }
+                                                    segmentsPerFacet[neighbourFacet.id][ns] = null;
+                                                    matchFound = true;
+                                                    break;
+                                                }
+                                                else if (matchesReverse) {
+                                                    // start & end points match  but in reverse order
+                                                    if (debug) {
+                                                        console.log("Reverse match found for facet " + f.id + " to neighbour " + neighbourFacet.id);
+                                                    }
+                                                    neighbourFacet.borderSegments[ns] = new FacetBoundarySegment(segment, f.id, true);
+                                                    if (debug) {
+                                                        console.log("Setting facet " + neighbourFacet.id + " segment " + ns + " to " + neighbourFacet.borderSegments[ns]);
+                                                    }
+                                                    segmentsPerFacet[neighbourFacet.id][ns] = null;
+                                                    matchFound = true;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if (!matchFound && debug) {
+                                        // it's possible that the border is not shared with its neighbour
+                                        // this can happen when the segment fully falls inside the other facet
+                                        // though the above checks in the preparation of the segments should probably
+                                        // cover all cases
+                                        console.error("No match found for segment of " + f.id + ": " +
+                                            ("siding " + segment.neighbour + " " + segment.points[0] + " -> " + segment.points[segment.points.length - 1]));
+                                    }
+                                }
+                            }
+                            // clear the current segment so it can't be processed again when processing the neighbour facet
+                            segmentsPerFacet[f.id][s] = null;
+                        }
+                        if (count % 100 === 0) {
+                            yield common_1.delay(0);
+                            if (onUpdate != null) {
+                                onUpdate(f.id / facetResult.facets.length);
+                            }
+                        }
+                    }
+                    count++;
+                }
+                if (onUpdate != null) {
+                    onUpdate(1);
+                }
+            });
+        }
+    }
+    exports.FacetBorderSegmenter = FacetBorderSegmenter;
+});
+define("facetmanagement", ["require", "exports", "structs/point"], function (require, exports, point_2) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    var OrientationEnum;
+    (function (OrientationEnum) {
+        OrientationEnum[OrientationEnum["Left"] = 0] = "Left";
+        OrientationEnum[OrientationEnum["Top"] = 1] = "Top";
+        OrientationEnum[OrientationEnum["Right"] = 2] = "Right";
+        OrientationEnum[OrientationEnum["Bottom"] = 3] = "Bottom";
+    })(OrientationEnum = exports.OrientationEnum || (exports.OrientationEnum = {}));
+    /**
+     * PathPoint is a point with an orientation that indicates which wall border is set
+     */
+    class PathPoint extends point_2.Point {
+        constructor(pt, orientation) {
+            super(pt.x, pt.y);
+            this.orientation = orientation;
+        }
+        getWallX() {
+            let x = this.x;
+            if (this.orientation === OrientationEnum.Left) {
+                x -= 0.5;
+            }
+            else if (this.orientation === OrientationEnum.Right) {
+                x += 0.5;
+            }
+            return x;
+        }
+        getWallY() {
+            let y = this.y;
+            if (this.orientation === OrientationEnum.Top) {
+                y -= 0.5;
+            }
+            else if (this.orientation === OrientationEnum.Bottom) {
+                y += 0.5;
+            }
+            return y;
+        }
+        getNeighbour(facetResult) {
+            switch (this.orientation) {
+                case OrientationEnum.Left:
+                    if (this.x - 1 >= 0) {
+                        return facetResult.facetMap.get(this.x - 1, this.y);
+                    }
+                    break;
+                case OrientationEnum.Right:
+                    if (this.x + 1 < facetResult.width) {
+                        return facetResult.facetMap.get(this.x + 1, this.y);
+                    }
+                    break;
+                case OrientationEnum.Top:
+                    if (this.y - 1 >= 0) {
+                        return facetResult.facetMap.get(this.x, this.y - 1);
+                    }
+                    break;
+                case OrientationEnum.Bottom:
+                    if (this.y + 1 < facetResult.height) {
+                        return facetResult.facetMap.get(this.x, this.y + 1);
+                    }
+                    break;
+            }
+            return -1;
+        }
+        toString() {
+            return this.x + "," + this.y + " " + this.orientation;
+        }
+    }
+    exports.PathPoint = PathPoint;
+    /**
+     *  A facet that represents an area of pixels of the same color
+     */
+    class Facet {
+        constructor() {
+            this.pointCount = 0;
+            /**
+             * Flag indicating if the neighbourfacets array is dirty. If it is, the neighbourfacets *have* to be rebuild
+             * Before it can be used. This is useful to defer the rebuilding of the array until it's actually needed
+             * and can remove a lot of duplicate building of the array because multiple facets were hitting the same neighbour
+             * (over 50% on test images)
+             */
+            this.neighbourFacetsIsDirty = false;
+        }
+        getFullPathFromBorderSegments(useWalls) {
+            const newpath = [];
+            const addPoint = (pt) => {
+                if (useWalls) {
+                    newpath.push(new point_2.Point(pt.getWallX(), pt.getWallY()));
+                }
+                else {
+                    newpath.push(new point_2.Point(pt.x, pt.y));
+                }
+            };
+            let lastSegment = null;
+            for (const seg of this.borderSegments) {
+                // fix for the continuitity of the border segments. If transition points between border segments on the path aren't repeated, the
+                // borders of the facets aren't always matching up leaving holes when rendered
+                if (lastSegment != null) {
+                    if (lastSegment.reverseOrder) {
+                        addPoint(lastSegment.originalSegment.points[0]);
+                    }
+                    else {
+                        addPoint(lastSegment.originalSegment.points[lastSegment.originalSegment.points.length - 1]);
+                    }
+                }
+                for (let i = 0; i < seg.originalSegment.points.length; i++) {
+                    const idx = seg.reverseOrder ? (seg.originalSegment.points.length - 1 - i) : i;
+                    addPoint(seg.originalSegment.points[idx]);
+                }
+                lastSegment = seg;
+            }
+            return newpath;
+        }
+    }
+    exports.Facet = Facet;
+    /**
+     *  Result of the facet construction, both as a map and as an array.
+     *  Facets in the array can be null when they've been deleted
+     */
+    class FacetResult {
+    }
+    exports.FacetResult = FacetResult;
+});
+define("facetCreator", ["require", "exports", "common", "lib/fill", "structs/boundingbox", "structs/point", "structs/typedarrays", "facetmanagement"], function (require, exports, common_2, fill_1, boundingbox_1, point_3, typedarrays_1, facetmanagement_2) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    class FacetCreator {
+        /**
+         *  Constructs the facets with its border points for each area of pixels of the same color
+         */
+        static getFacets(width, height, imgColorIndices, onUpdate = null) {
+            return __awaiter(this, void 0, void 0, function* () {
+                const result = new facetmanagement_2.FacetResult();
+                result.width = width;
+                result.height = height;
+                // setup visited mask
+                const visited = new typedarrays_1.BooleanArray2D(result.width, result.height);
+                // setup facet map & array
+                result.facetMap = new typedarrays_1.Uint32Array2D(result.width, result.height);
+                result.facets = [];
+                // depth first traversal to find the different facets
+                let count = 0;
+                for (let j = 0; j < result.height; j++) {
+                    for (let i = 0; i < result.width; i++) {
+                        const colorIndex = imgColorIndices.get(i, j);
+                        if (!visited.get(i, j)) {
+                            const facetIndex = result.facets.length;
+                            // build a facet starting at point i,j
+                            const facet = FacetCreator.buildFacet(facetIndex, colorIndex, i, j, visited, imgColorIndices, result);
+                            result.facets.push(facet);
+                            if (count % 100 === 0) {
+                                yield common_2.delay(0);
+                                if (onUpdate != null) {
+                                    onUpdate(count / (result.width * result.height));
+                                }
+                            }
+                        }
+                        count++;
+                    }
+                }
+                yield common_2.delay(0);
+                // fill in the neighbours of all facets by checking the neighbours of the border points
+                for (const f of result.facets) {
+                    if (f != null) {
+                        FacetCreator.buildFacetNeighbour(f, result);
+                    }
+                }
+                if (onUpdate != null) {
+                    onUpdate(1);
+                }
+                return result;
+            });
+        }
+        /**
+         *  Builds a facet at given x,y using depth first search to visit all pixels of the same color
+         */
+        static buildFacet(facetIndex, facetColorIndex, x, y, visited, imgColorIndices, facetResult) {
+            const facet = new facetmanagement_2.Facet();
+            facet.id = facetIndex;
+            facet.color = facetColorIndex;
+            facet.bbox = new boundingbox_1.BoundingBox();
+            facet.borderPoints = [];
+            fill_1.fill(x, y, facetResult.width, facetResult.height, (ptx, pty) => visited.get(ptx, pty) || imgColorIndices.get(ptx, pty) !== facetColorIndex, (ptx, pty) => {
+                visited.set(ptx, pty, true);
+                facetResult.facetMap.set(ptx, pty, facetIndex);
+                facet.pointCount++;
+                // determine if the point is a border or not
+                /*  const isInnerPoint = (ptx - 1 >= 0 && imgColorIndices.get(ptx - 1, pty) === facetColorIndex) &&
+                      (pty - 1 >= 0 && imgColorIndices.get(ptx, pty - 1) === facetColorIndex) &&
+                      (ptx + 1 < facetResult.width && imgColorIndices.get(ptx + 1, pty) === facetColorIndex) &&
+                      (pty + 1 < facetResult.height && imgColorIndices.get(ptx, pty + 1) === facetColorIndex);
+                */
+                const isInnerPoint = imgColorIndices.matchAllAround(ptx, pty, facetColorIndex);
+                if (!isInnerPoint) {
+                    facet.borderPoints.push(new point_3.Point(ptx, pty));
+                }
+                // update bounding box of facet
+                if (ptx > facet.bbox.maxX) {
+                    facet.bbox.maxX = ptx;
+                }
+                if (pty > facet.bbox.maxY) {
+                    facet.bbox.maxY = pty;
+                }
+                if (ptx < facet.bbox.minX) {
+                    facet.bbox.minX = ptx;
+                }
+                if (pty < facet.bbox.minY) {
+                    facet.bbox.minY = pty;
+                }
+            });
+            /*
+               // using a 1D flattened stack (x*width+y), we can avoid heap allocations of Point objects, which halves the garbage collection time
+             let stack: number[] = [];
+             stack.push(y * facetResult.width + x);
+    
+             while (stack.length > 0) {
+                 let pt = stack.pop()!;
+                 let ptx = pt % facetResult.width;
+                 let pty = Math.floor(pt / facetResult.width);
+    
+                 // if the point wasn't visited before and matches
+                 // the same color
+                 if (!visited.get(ptx, pty) &&
+                     imgColorIndices.get(ptx, pty) == facetColorIndex) {
+    
+                     visited.set(ptx, pty, true);
+                     facetResult.facetMap.set(ptx, pty, facetIndex);
+                     facet.pointCount++;
+    
+                     // determine if the point is a border or not
+                     let isInnerPoint = (ptx - 1 >= 0 && imgColorIndices.get(ptx - 1, pty) == facetColorIndex) &&
+                         (pty - 1 >= 0 && imgColorIndices.get(ptx, pty - 1) == facetColorIndex) &&
+                         (ptx + 1 < facetResult.width && imgColorIndices.get(ptx + 1, pty) == facetColorIndex) &&
+                         (pty + 1 < facetResult.height && imgColorIndices.get(ptx, pty + 1) == facetColorIndex);
+    
+                     if (!isInnerPoint)
+                         facet.borderPoints.push(new Point(ptx, pty));
+    
+                     // update bounding box of facet
+                     if (ptx > facet.bbox.maxX) facet.bbox.maxX = ptx;
+                     if (pty > facet.bbox.maxY) facet.bbox.maxY = pty;
+                     if (ptx < facet.bbox.minX) facet.bbox.minX = ptx;
+                     if (pty < facet.bbox.minY) facet.bbox.minY = pty;
+    
+                     // visit direct adjacent points
+                     if (ptx - 1 >= 0 && !visited.get(ptx - 1, pty))
+                         stack.push(pty * facetResult.width + (ptx - 1)); //stack.push(new Point(pt.x - 1, pt.y));
+                     if (pty - 1 >= 0 && !visited.get(ptx, pty - 1))
+                         stack.push((pty - 1) * facetResult.width + ptx); //stack.push(new Point(pt.x, pt.y - 1));
+                     if (ptx + 1 < facetResult.width && !visited.get(ptx + 1, pty))
+                         stack.push(pty * facetResult.width + (ptx + 1));//stack.push(new Point(pt.x + 1, pt.y));
+                     if (pty + 1 < facetResult.height && !visited.get(ptx, pty + 1))
+                         stack.push((pty + 1) * facetResult.width + ptx); //stack.push(new Point(pt.x, pt.y + 1));
+                 }
+             }
+             */
+            return facet;
+        }
+        /**
+         * Check which neighbour facets the given facet has by checking the neighbour facets at each border point
+         */
+        static buildFacetNeighbour(facet, facetResult) {
+            facet.neighbourFacets = [];
+            const uniqueFacets = {}; // poor man's set
+            for (const pt of facet.borderPoints) {
+                if (pt.x - 1 >= 0) {
+                    const leftFacetId = facetResult.facetMap.get(pt.x - 1, pt.y);
+                    if (leftFacetId !== facet.id) {
+                        uniqueFacets[leftFacetId] = true;
+                    }
+                }
+                if (pt.y - 1 >= 0) {
+                    const topFacetId = facetResult.facetMap.get(pt.x, pt.y - 1);
+                    if (topFacetId !== facet.id) {
+                        uniqueFacets[topFacetId] = true;
+                    }
+                }
+                if (pt.x + 1 < facetResult.width) {
+                    const rightFacetId = facetResult.facetMap.get(pt.x + 1, pt.y);
+                    if (rightFacetId !== facet.id) {
+                        uniqueFacets[rightFacetId] = true;
+                    }
+                }
+                if (pt.y + 1 < facetResult.height) {
+                    const bottomFacetId = facetResult.facetMap.get(pt.x, pt.y + 1);
+                    if (bottomFacetId !== facet.id) {
+                        uniqueFacets[bottomFacetId] = true;
+                    }
+                }
+            }
+            for (const k of Object.keys(uniqueFacets)) {
+                if (uniqueFacets.hasOwnProperty(k)) {
+                    facet.neighbourFacets.push(parseInt(k));
+                }
+            }
+            // the neighbour array is updated so it's not dirty anymore
+            facet.neighbourFacetsIsDirty = false;
+        }
+    }
+    exports.FacetCreator = FacetCreator;
+});
+define("FacetReducer", ["require", "exports", "common", "facetCreator", "structs/typedarrays"], function (require, exports, common_3, facetCreator_1, typedarrays_2) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    class FacetReducer {
+        /**
+         *  Remove all facets that have a pointCount smaller than the given number.
+         */
+        static reduceFacets(smallerThan, removeFacetsFromLargeToSmall, colorsByIndex, facetResult, imgColorIndices, onUpdate = null) {
+            return __awaiter(this, void 0, void 0, function* () {
+                let count = 0;
+                const visitedCache = new typedarrays_2.BooleanArray2D(facetResult.width, facetResult.height);
+                // build the color distance matrix, which describes the distance of each color to each other
+                const colorDistances = FacetReducer.buildColorDistanceMatrix(colorsByIndex);
+                // process facets from large to small. This results in better consistency with the original image
+                // because the small facets act as boundary for the large merges keeping them mostly in place of where they should remain
+                // then afterwards the smaller ones are deleted which will just end up completely isolated and thus entirely replaced
+                // with the outer facet. But then again, what do I know, I'm just a comment.
+                const facetProcessingOrder = facetResult.facets.filter((f) => f != null).slice(0).sort((a, b) => b.pointCount > a.pointCount ? 1 : (b.pointCount < a.pointCount ? -1 : 0)).map((f) => f.id);
+                if (!removeFacetsFromLargeToSmall) {
+                    facetProcessingOrder.reverse();
+                }
+                let curTime = new Date().getTime();
+                for (let fidx = 0; fidx < facetProcessingOrder.length; fidx++) {
+                    const f = facetResult.facets[facetProcessingOrder[fidx]];
+                    // facets can be removed by merging by others due to a previous facet deletion
+                    if (f != null && f.pointCount < smallerThan) {
+                        const facetToRemove = f;
+                        FacetReducer.deleteFacet(facetToRemove, facetResult, imgColorIndices, colorDistances, visitedCache);
+                        if (new Date().getTime() - curTime > 500) {
+                            curTime = new Date().getTime();
+                            yield common_3.delay(0);
+                            if (onUpdate != null) {
+                                onUpdate(fidx / facetProcessingOrder.length);
+                            }
+                        }
+                    }
+                    count++;
+                }
+                if (onUpdate != null) {
+                    onUpdate(1);
+                }
+            });
+        }
+        /**
+         * Deletes a facet. All points belonging to the facet are moved to the nearest neighbour facet
+         * based on the distance of the neighbour border points. This results in a voronoi like filling in of the
+         * void the deletion made
+         */
+        static deleteFacet(facetToRemove, facetResult, imgColorIndices, colorDistances, visitedArrayCache) {
+            // there are many small facets, it's faster to just iterate over all points within its bounding box
+            // and seeing which belong to the facet than to keep track of the inner points (along with the border points)
+            // per facet, because that generates a lot of extra heap objects that need to be garbage collected each time
+            // a facet is rebuilt
+            for (let j = facetToRemove.bbox.minY; j <= facetToRemove.bbox.maxY; j++) {
+                for (let i = facetToRemove.bbox.minX; i <= facetToRemove.bbox.maxX; i++) {
+                    if (facetResult.facetMap.get(i, j) === facetToRemove.id) {
+                        let closestNeighbour = -1;
+                        let minDistance = Number.MAX_VALUE;
+                        let minColorDistance = Number.MAX_VALUE;
+                        // ensure the neighbour facets is up to date if it was marked as dirty
+                        if (facetToRemove.neighbourFacetsIsDirty) {
+                            facetCreator_1.FacetCreator.buildFacetNeighbour(facetToRemove, facetResult);
+                        }
+                        // determine which neighbour will receive the current point based on the distance, and if there are more with the same
+                        // distance, then take the neighbour with the closes color
+                        for (const neighbourIdx of facetToRemove.neighbourFacets) {
+                            const neighbour = facetResult.facets[neighbourIdx];
+                            if (neighbour != null) {
+                                for (const bpt of neighbour.borderPoints) {
+                                    const distance = bpt.distanceToCoord(i, j);
+                                    if (distance < minDistance) {
+                                        minDistance = distance;
+                                        closestNeighbour = neighbourIdx;
+                                        minColorDistance = Number.MAX_VALUE; // reset color distance
+                                    }
+                                    else if (distance === minDistance) {
+                                        // if the distance is equal as the min distance
+                                        // then see if the neighbour's color is closer to the current color
+                                        // note: this causes morepoints to be reallocated to different neighbours
+                                        // in the sanity check later, but still yields a better visual result
+                                        const colorDistance = colorDistances[facetToRemove.color][neighbour.color];
+                                        if (colorDistance < minColorDistance) {
+                                            minColorDistance = colorDistance;
+                                            closestNeighbour = neighbourIdx;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        // copy over color of closest neighbour
+                        imgColorIndices.set(i, j, facetResult.facets[closestNeighbour].color);
+                    }
+                }
+            }
+            // Rebuild all the neighbour facets that have been changed. While it could probably be faster by just adding the points manually
+            // to the facet map and determine if the border points are still valid, it's more complex than that. It's possible that due to the change in points
+            // that 2 neighbours of the same colors have become linked and need to merged as well. So it's easier to just rebuild the entire facet
+            FacetReducer.rebuildChangedFacets(visitedArrayCache, facetToRemove, imgColorIndices, facetResult);
+            // sanity check: make sure that all points have been replaced by neighbour facets. It's possible that some points will have
+            // been left out because there is no continuity with the neighbour points
+            // this occurs for diagonal points to the neighbours and more often when the closest
+            // color is chosen when distances are equal.
+            // It's probably possible to enforce that this will never happen in the above code but
+            // this is a constraint that is expensive to enforce and doesn't happen all that much
+            // so instead try and merge if with any of its direct neighbours if possible
+            let needsToRebuild = false;
+            for (let y = facetToRemove.bbox.minY; y <= facetToRemove.bbox.maxY; y++) {
+                for (let x = facetToRemove.bbox.minX; x <= facetToRemove.bbox.maxX; x++) {
+                    if (facetResult.facetMap.get(x, y) === facetToRemove.id) {
+                        console.warn(`Point ${x},${y} was reallocated to neighbours for facet ${facetToRemove.id} deletion`);
+                        needsToRebuild = true;
+                        if (x - 1 >= 0 && facetResult.facetMap.get(x - 1, y) !== facetToRemove.id && facetResult.facets[facetResult.facetMap.get(x - 1, y)] !== null) {
+                            imgColorIndices.set(x, y, facetResult.facets[facetResult.facetMap.get(x - 1, y)].color);
+                        }
+                        else if (y - 1 >= 0 && facetResult.facetMap.get(x, y - 1) !== facetToRemove.id && facetResult.facets[facetResult.facetMap.get(x, y - 1)] !== null) {
+                            imgColorIndices.set(x, y, facetResult.facets[facetResult.facetMap.get(x, y - 1)].color);
+                        }
+                        else if (x + 1 < facetResult.width && facetResult.facetMap.get(x + 1, y) !== facetToRemove.id && facetResult.facets[facetResult.facetMap.get(x + 1, y)] !== null) {
+                            imgColorIndices.set(x, y, facetResult.facets[facetResult.facetMap.get(x + 1, y)].color);
+                        }
+                        else if (y + 1 < facetResult.height && facetResult.facetMap.get(x, y + 1) !== facetToRemove.id && facetResult.facets[facetResult.facetMap.get(x, y + 1)] !== null) {
+                            imgColorIndices.set(x, y, facetResult.facets[facetResult.facetMap.get(x, y + 1)].color);
+                        }
+                        else {
+                            console.error(`Unable to reallocate point ${x},${y}`);
+                        }
+                    }
+                }
+            }
+            // now we need to go through the thing again to build facets and update the neighbours
+            if (needsToRebuild) {
+                FacetReducer.rebuildChangedFacets(visitedArrayCache, facetToRemove, imgColorIndices, facetResult);
+            }
+            // now mark the facet to remove as deleted
+            facetResult.facets[facetToRemove.id] = null;
+        }
+        /**
+         *  Rebuilds the given changed facets
+         */
+        static rebuildChangedFacets(visitedArrayCache, facetToRemove, imgColorIndices, facetResult) {
+            const changedNeighboursSet = {};
+            if (facetToRemove.neighbourFacetsIsDirty) {
+                facetCreator_1.FacetCreator.buildFacetNeighbour(facetToRemove, facetResult);
+            }
+            for (const neighbourIdx of facetToRemove.neighbourFacets) {
+                const neighbour = facetResult.facets[neighbourIdx];
+                if (neighbour != null) {
+                    // re-evaluate facet
+                    // track all the facets that needs to have their neighbour list updated
+                    changedNeighboursSet[neighbourIdx] = true;
+                    if (neighbour.neighbourFacetsIsDirty) {
+                        facetCreator_1.FacetCreator.buildFacetNeighbour(neighbour, facetResult);
+                    }
+                    for (const n of neighbour.neighbourFacets) {
+                        changedNeighboursSet[n] = true;
+                    }
+                    // rebuild the neighbour facet
+                    const newFacet = facetCreator_1.FacetCreator.buildFacet(neighbourIdx, neighbour.color, neighbour.borderPoints[0].x, neighbour.borderPoints[0].y, visitedArrayCache, imgColorIndices, facetResult);
+                    facetResult.facets[neighbourIdx] = newFacet;
+                    // it's possible that any of the neighbour facets are now overlapping
+                    // because if for example facet Red - Green - Red, Green is removed
+                    // then it will become Red - Red and both facets will overlap
+                    // this means the facet will have 0 points remaining
+                    if (newFacet.pointCount === 0) {
+                        // remove the empty facet as well
+                        facetResult.facets[neighbourIdx] = null;
+                    }
+                }
+            }
+            // reset the visited array for all neighbours
+            // while the visited array could be recreated per facet to remove, it's quite big and introduces
+            // a lot of allocation / cleanup overhead. Due to the size of the facets it's usually faster
+            // to just flag every point of the facet as false again
+            if (facetToRemove.neighbourFacetsIsDirty) {
+                facetCreator_1.FacetCreator.buildFacetNeighbour(facetToRemove, facetResult);
+            }
+            for (const neighbourIdx of facetToRemove.neighbourFacets) {
+                const neighbour = facetResult.facets[neighbourIdx];
+                if (neighbour != null) {
+                    for (let y = neighbour.bbox.minY; y <= neighbour.bbox.maxY; y++) {
+                        for (let x = neighbour.bbox.minX; x <= neighbour.bbox.maxX; x++) {
+                            if (facetResult.facetMap.get(x, y) === neighbour.id) {
+                                visitedArrayCache.set(x, y, false);
+                            }
+                        }
+                    }
+                }
+            }
+            // rebuild neighbour array for affected neighbours
+            for (const k of Object.keys(changedNeighboursSet)) {
+                if (changedNeighboursSet.hasOwnProperty(k)) {
+                    const neighbourIdx = parseInt(k);
+                    const f = facetResult.facets[neighbourIdx];
+                    if (f != null) {
+                        // it's a lot faster when deferring the neighbour array updates
+                        // because a lot of facets that are deleted share the same facet neighbours
+                        // and removing the unnecessary neighbour array checks until they it's needed
+                        // speeds things up significantly
+                        // FacetCreator.buildFacetNeighbour(f, facetResult);
+                        f.neighbourFacets = null;
+                        f.neighbourFacetsIsDirty = true;
+                    }
+                }
+            }
+        }
+        /**
+         *  Builds a distance matrix for each color to each other
+         */
+        static buildColorDistanceMatrix(colorsByIndex) {
+            const colorDistances = new Array(colorsByIndex.length);
+            for (let j = 0; j < colorsByIndex.length; j++) {
+                colorDistances[j] = new Array(colorDistances.length);
+            }
+            for (let j = 0; j < colorsByIndex.length; j++) {
+                for (let i = j; i < colorsByIndex.length; i++) {
+                    const c1 = colorsByIndex[j];
+                    const c2 = colorsByIndex[i];
+                    const distance = Math.sqrt((c1[0] - c2[0]) * (c1[0] - c2[0]) +
+                        (c1[1] - c2[1]) * (c1[1] - c2[1]) +
+                        (c1[2] - c2[2]) * (c1[2] - c2[2]));
+                    colorDistances[i][j] = distance;
+                    colorDistances[j][i] = distance;
+                }
+            }
+            return colorDistances;
+        }
+    }
+    exports.FacetReducer = FacetReducer;
+});
 define("lib/clustering", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -272,60 +1306,7 @@ define("settings", ["require", "exports"], function (require, exports) {
     }
     exports.Settings = Settings;
 });
-define("structs/typedarrays", ["require", "exports"], function (require, exports) {
-    "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
-    class Uint32Array2D {
-        constructor(width, height) {
-            this.width = width;
-            this.height = height;
-            this.arr = new Uint32Array(width * height);
-        }
-        get(x, y) {
-            return this.arr[y * this.width + x];
-        }
-        set(x, y, value) {
-            this.arr[y * this.width + x] = value;
-        }
-    }
-    exports.Uint32Array2D = Uint32Array2D;
-    class Uint8Array2D {
-        constructor(width, height) {
-            this.width = width;
-            this.height = height;
-            this.arr = new Uint8Array(width * height);
-        }
-        get(x, y) {
-            return this.arr[y * this.width + x];
-        }
-        set(x, y, value) {
-            this.arr[y * this.width + x] = value;
-        }
-        matchAllAround(x, y, value) {
-            const idx = y * this.width + x;
-            return (x - 1 >= 0 && this.arr[idx - 1] === value) &&
-                (y - 1 >= 0 && this.arr[idx - this.width] === value) &&
-                (x + 1 < this.width && this.arr[idx + 1] === value) &&
-                (y + 1 < this.height && this.arr[idx + this.width] === value);
-        }
-    }
-    exports.Uint8Array2D = Uint8Array2D;
-    class BooleanArray2D {
-        constructor(width, height) {
-            this.width = width;
-            this.height = height;
-            this.arr = new Uint8Array(width * height);
-        }
-        get(x, y) {
-            return this.arr[y * this.width + x] !== 0;
-        }
-        set(x, y, value) {
-            this.arr[y * this.width + x] = value ? 1 : 0;
-        }
-    }
-    exports.BooleanArray2D = BooleanArray2D;
-});
-define("colorreductionmanagement", ["require", "exports", "common", "lib/clustering", "lib/colorconversion", "settings", "structs/typedarrays"], function (require, exports, common_1, clustering_1, colorconversion_1, settings_1, typedarrays_1) {
+define("colorreductionmanagement", ["require", "exports", "common", "lib/clustering", "lib/colorconversion", "settings", "structs/typedarrays"], function (require, exports, common_4, clustering_1, colorconversion_1, settings_1, typedarrays_3) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     class ColorMapResult {
@@ -336,7 +1317,7 @@ define("colorreductionmanagement", ["require", "exports", "common", "lib/cluster
          *  Creates a map of the various colors used
          */
         static createColorMap(kmeansImgData) {
-            const imgColorIndices = new typedarrays_1.Uint8Array2D(kmeansImgData.width, kmeansImgData.height);
+            const imgColorIndices = new typedarrays_3.Uint8Array2D(kmeansImgData.width, kmeansImgData.height);
             let colorIndex = 0;
             const colors = {};
             const colorsByIndex = [];
@@ -428,7 +1409,7 @@ define("colorreductionmanagement", ["require", "exports", "common", "lib/cluster
                     // update GUI every 500ms
                     if (new Date().getTime() - curTime > 500) {
                         curTime = new Date().getTime();
-                        yield common_1.delay(0);
+                        yield common_4.delay(0);
                         if (onUpdate != null) {
                             ColorReducer.updateKmeansOutputImageData(kmeans, settings, pointsByColor, imgData, outputImgData, false);
                             onUpdate(kmeans);
@@ -517,94 +1498,505 @@ define("colorreductionmanagement", ["require", "exports", "common", "lib/cluster
     }
     exports.ColorReducer = ColorReducer;
 });
-// Faster flood fill from
-// http://www.adammil.net/blog/v126_A_More_Efficient_Flood_Fill.html
-define("lib/fill", ["require", "exports"], function (require, exports) {
+define("facetBorderTracer", ["require", "exports", "common", "structs/point", "structs/typedarrays", "facetmanagement"], function (require, exports, common_5, point_4, typedarrays_4, facetmanagement_3) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    function fill(x, y, width, height, visited, setFill) {
-        // at this point, we know array[y,x] is clear, and we want to move as far as possible to the upper-left. moving
-        // up is much more important than moving left, so we could try to make this smarter by sometimes moving to
-        // the right if doing so would allow us to move further up, but it doesn't seem worth the complexit
-        let xx = x;
-        let yy = y;
-        while (true) {
-            const ox = xx;
-            const oy = yy;
-            while (yy !== 0 && !visited(xx, yy - 1)) {
-                yy--;
+    class FacetBorderTracer {
+        /**
+         *  Traces the border path of the facet from the facet border points.
+         *  Imagine placing walls around the outer side of the border points.
+         */
+        static buildFacetBorderPaths(facetResult, onUpdate = null) {
+            return __awaiter(this, void 0, void 0, function* () {
+                let count = 0;
+                const borderMask = new typedarrays_4.BooleanArray2D(facetResult.width, facetResult.height);
+                // sort by biggest facets first
+                const facetProcessingOrder = facetResult.facets.filter((f) => f != null).slice(0).sort((a, b) => b.pointCount > a.pointCount ? 1 : (b.pointCount < a.pointCount ? -1 : 0)).map((f) => f.id);
+                for (let fidx = 0; fidx < facetProcessingOrder.length; fidx++) {
+                    const f = facetResult.facets[facetProcessingOrder[fidx]];
+                    if (f != null) {
+                        for (const bp of f.borderPoints) {
+                            borderMask.set(bp.x, bp.y, true);
+                        }
+                        // keep track of which walls are already set on each pixel
+                        // e.g. xWall.get(x,y) is the left wall of point x,y
+                        // as the left wall of (x+1,y) and right wall of (x,y) is the same
+                        // the right wall of x,y can be set with xWall.set(x+1,y).
+                        // Analogous for the horizontal walls in yWall
+                        const xWall = new typedarrays_4.BooleanArray2D(facetResult.width + 1, facetResult.height + 1);
+                        const yWall = new typedarrays_4.BooleanArray2D(facetResult.width + 1, facetResult.height + 1);
+                        // the first border point will guaranteed be one of the outer ones because
+                        // it will be the first point that is encountered of the facet when building
+                        // them in buildFacet with DFS.
+                        // --> Or so I thought, which is apparently not the case in rare circumstances
+                        // sooooo go look for a border that edges with the bounding box, this is definitely
+                        // on the outer side then.
+                        let borderStartIndex = -1;
+                        for (let i = 0; i < f.borderPoints.length; i++) {
+                            if ((f.borderPoints[i].x === f.bbox.minX || f.borderPoints[i].x === f.bbox.maxX) ||
+                                (f.borderPoints[i].y === f.bbox.minY || f.borderPoints[i].y === f.bbox.maxY)) {
+                                borderStartIndex = i;
+                                break;
+                            }
+                        }
+                        // determine the starting point orientation (the outside of facet)
+                        const pt = new facetmanagement_3.PathPoint(f.borderPoints[borderStartIndex], facetmanagement_3.OrientationEnum.Left);
+                        // L T R B
+                        if (pt.x - 1 < 0 || facetResult.facetMap.get(pt.x - 1, pt.y) !== f.id) {
+                            pt.orientation = facetmanagement_3.OrientationEnum.Left;
+                        }
+                        else if (pt.y - 1 < 0 || facetResult.facetMap.get(pt.x, pt.y - 1) !== f.id) {
+                            pt.orientation = facetmanagement_3.OrientationEnum.Top;
+                        }
+                        else if (pt.x + 1 >= facetResult.width || facetResult.facetMap.get(pt.x + 1, pt.y) !== f.id) {
+                            pt.orientation = facetmanagement_3.OrientationEnum.Right;
+                        }
+                        else if (pt.y + 1 >= facetResult.height || facetResult.facetMap.get(pt.x, pt.y + 1) !== f.id) {
+                            pt.orientation = facetmanagement_3.OrientationEnum.Bottom;
+                        }
+                        // build a border path from that point
+                        const path = FacetBorderTracer.getPath(pt, facetResult, f, borderMask, xWall, yWall);
+                        f.borderPath = path;
+                        if (count % 100 === 0) {
+                            yield common_5.delay(0);
+                            if (onUpdate != null) {
+                                onUpdate(fidx / facetProcessingOrder.length);
+                            }
+                        }
+                    }
+                    count++;
+                }
+                if (onUpdate != null) {
+                    onUpdate(1);
+                }
+            });
+        }
+        /**
+         * Returns a border path starting from the given point
+         */
+        static getPath(pt, facetResult, f, borderMask, xWall, yWall) {
+            const debug = false;
+            let finished = false;
+            const count = 0;
+            const path = [];
+            FacetBorderTracer.addPointToPath(path, pt, xWall, f, yWall);
+            // check rotations first, then straight along the ouside and finally diagonally
+            // this ensures that bends are always taken as tight as possible
+            // so it doesn't skip border points to later loop back to and get stuck (hopefully)
+            while (!finished) {
+                if (debug) {
+                    console.log(pt.x + " " + pt.y + " " + pt.orientation);
+                }
+                // yes, technically i could do some trickery to only get the left/top cases
+                // by shifting the pixels but that means some more shenanigans in correct order of things
+                // so whatever. (And yes I tried it but it wasn't worth the debugging hell that ensued)
+                const possibleNextPoints = [];
+                //   +---+---+
+                //   |  <|   |
+                //   +---+---+
+                if (pt.orientation === facetmanagement_3.OrientationEnum.Left) {
+                    // check rotate to top
+                    //   +---+---+
+                    //   |   |   |
+                    //   +---xnnnn (x = old wall, n = new wall, F = current facet x,y)
+                    //   |   x F |
+                    //   +---x---+
+                    if (((pt.y - 1 >= 0 && facetResult.facetMap.get(pt.x, pt.y - 1) !== f.id) // top exists and is a neighbour facet
+                        || pt.y - 1 < 0) // or top doesn't exist, which is the boundary of the image
+                        && !yWall.get(pt.x, pt.y)) { // and the wall isn't set yet
+                        // can place top _ wall at x,y
+                        if (debug) {
+                            console.log("can place top _ wall at x,y");
+                        }
+                        const nextpt = new facetmanagement_3.PathPoint(new point_4.Point(pt.x, pt.y), facetmanagement_3.OrientationEnum.Top);
+                        possibleNextPoints.push(nextpt);
+                    }
+                    // check rotate to bottom
+                    //   +---+---+
+                    //   |   |   |
+                    //   +---x---+ (x = old wall, n = new wall, F = current facet x,y)
+                    //   |   x F |
+                    //   +---xnnnn
+                    if (((pt.y + 1 < facetResult.height && facetResult.facetMap.get(pt.x, pt.y + 1) !== f.id) // bottom exists and is a neighbour facet
+                        || pt.y + 1 >= facetResult.height) // or bottom doesn't exist, which is the boundary of the image
+                        && !yWall.get(pt.x, pt.y + 1)) { // and the wall isn't set yet
+                        // can place bottom  _ wall at x,y
+                        if (debug) {
+                            console.log("can place bottom _ wall at x,y");
+                        }
+                        const nextpt = new facetmanagement_3.PathPoint(new point_4.Point(pt.x, pt.y), facetmanagement_3.OrientationEnum.Bottom);
+                        possibleNextPoints.push(nextpt);
+                    }
+                    // check upwards
+                    //   +---n---+
+                    //   |   n   |
+                    //   +---x---+ (x = old wall, n = new wall, F = current facet x,y)
+                    //   |   x F |
+                    //   +---x---+
+                    if (pt.y - 1 >= 0 // top exists
+                        && facetResult.facetMap.get(pt.x, pt.y - 1) === f.id // and is part of the same facet
+                        && (pt.x - 1 < 0 || facetResult.facetMap.get(pt.x - 1, pt.y - 1) !== f.id) // and
+                        && borderMask.get(pt.x, pt.y - 1)
+                        && !xWall.get(pt.x, pt.y - 1)) {
+                        // can place | wall at x,y-1
+                        if (debug) {
+                            console.log(`can place left | wall at x,y-1`);
+                        }
+                        const nextpt = new facetmanagement_3.PathPoint(new point_4.Point(pt.x, pt.y - 1), facetmanagement_3.OrientationEnum.Left);
+                        possibleNextPoints.push(nextpt);
+                    }
+                    // check downwards
+                    //   +---x---+
+                    //   |   x F |
+                    //   +---x---+ (x = old wall, n = new wall, F = current facet x,y)
+                    //   |   n   |
+                    //   +---n---+
+                    if (pt.y + 1 < facetResult.height
+                        && facetResult.facetMap.get(pt.x, pt.y + 1) === f.id
+                        && (pt.x - 1 < 0 || facetResult.facetMap.get(pt.x - 1, pt.y + 1) !== f.id)
+                        && borderMask.get(pt.x, pt.y + 1)
+                        && !xWall.get(pt.x, pt.y + 1)) {
+                        // can place | wall at x,y+1
+                        if (debug) {
+                            console.log("can place left | wall at x,y+1");
+                        }
+                        const nextpt = new facetmanagement_3.PathPoint(new point_4.Point(pt.x, pt.y + 1), facetmanagement_3.OrientationEnum.Left);
+                        possibleNextPoints.push(nextpt);
+                    }
+                    // check left upwards
+                    //   +---+---+
+                    //   |   |   |
+                    //   nnnnx---+ (x = old wall, n = new wall, F = current facet x,y)
+                    //   |   x F |
+                    //   +---x---+
+                    if (pt.y - 1 >= 0 && pt.x - 1 >= 0 // there is a left upwards
+                        && facetResult.facetMap.get(pt.x - 1, pt.y - 1) === f.id // and it belongs to the same facet
+                        && borderMask.get(pt.x - 1, pt.y - 1) // and is on the border
+                        && !yWall.get(pt.x - 1, pt.y - 1 + 1) // and the bottom wall isn't set yet
+                        && !yWall.get(pt.x, pt.y) // and the path didn't come from the top of the current one to prevent getting a T shaped path (issue: https://i.imgur.com/ggUWuXi.png)
+                    ) {
+                        // can place bottom _ wall at x-1,y-1
+                        if (debug) {
+                            console.log("can place bottom _ wall at x-1,y-1");
+                        }
+                        const nextpt = new facetmanagement_3.PathPoint(new point_4.Point(pt.x - 1, pt.y - 1), facetmanagement_3.OrientationEnum.Bottom);
+                        possibleNextPoints.push(nextpt);
+                    }
+                    // check left downwards
+                    //   +---x---+
+                    //   |   x F |
+                    //   nnnnx---+ (x = old wall, n = new wall, F = current facet x,y)
+                    //   |   |   |
+                    //   +---+---+
+                    if (pt.y + 1 < facetResult.height && pt.x - 1 >= 0 // there is a left downwards
+                        && facetResult.facetMap.get(pt.x - 1, pt.y + 1) === f.id // and belongs to the same facet
+                        && borderMask.get(pt.x - 1, pt.y + 1) // and is on the border
+                        && !yWall.get(pt.x - 1, pt.y + 1) // and the top wall isn't set yet
+                        && !yWall.get(pt.x, pt.y + 1) // and the path didn't come from the bottom of the current point to prevent T shape
+                    ) {
+                        // can place top _ wall at x-1,y+1
+                        if (debug) {
+                            console.log("can place top _ wall at x-1,y+1");
+                        }
+                        const nextpt = new facetmanagement_3.PathPoint(new point_4.Point(pt.x - 1, pt.y + 1), facetmanagement_3.OrientationEnum.Top);
+                        possibleNextPoints.push(nextpt);
+                    }
+                }
+                else if (pt.orientation === facetmanagement_3.OrientationEnum.Top) {
+                    // check rotate to left
+                    if (((pt.x - 1 >= 0
+                        && facetResult.facetMap.get(pt.x - 1, pt.y) !== f.id)
+                        || pt.x - 1 < 0)
+                        && !xWall.get(pt.x, pt.y)) {
+                        // can place left | wall at x,y
+                        if (debug) {
+                            console.log("can place left | wall at x,y");
+                        }
+                        const nextpt = new facetmanagement_3.PathPoint(new point_4.Point(pt.x, pt.y), facetmanagement_3.OrientationEnum.Left);
+                        possibleNextPoints.push(nextpt);
+                    }
+                    // check rotate to right
+                    if (((pt.x + 1 < facetResult.width
+                        && facetResult.facetMap.get(pt.x + 1, pt.y) !== f.id)
+                        || pt.x + 1 >= facetResult.width)
+                        && !xWall.get(pt.x + 1, pt.y)) {
+                        // can place right | wall at x,y
+                        if (debug) {
+                            console.log("can place right | wall at x,y");
+                        }
+                        const nextpt = new facetmanagement_3.PathPoint(new point_4.Point(pt.x, pt.y), facetmanagement_3.OrientationEnum.Right);
+                        possibleNextPoints.push(nextpt);
+                    }
+                    // check leftwards
+                    if (pt.x - 1 >= 0
+                        && facetResult.facetMap.get(pt.x - 1, pt.y) === f.id
+                        && (pt.y - 1 < 0 || facetResult.facetMap.get(pt.x - 1, pt.y - 1) !== f.id)
+                        && borderMask.get(pt.x - 1, pt.y)
+                        && !yWall.get(pt.x - 1, pt.y)) {
+                        // can place top _ wall at x-1,y
+                        if (debug) {
+                            console.log(`can place top _ wall at x-1,y`);
+                        }
+                        const nextpt = new facetmanagement_3.PathPoint(new point_4.Point(pt.x - 1, pt.y), facetmanagement_3.OrientationEnum.Top);
+                        possibleNextPoints.push(nextpt);
+                    }
+                    // check rightwards
+                    if (pt.x + 1 < facetResult.width
+                        && facetResult.facetMap.get(pt.x + 1, pt.y) === f.id
+                        && (pt.y - 1 < 0 || facetResult.facetMap.get(pt.x + 1, pt.y - 1) !== f.id)
+                        && borderMask.get(pt.x + 1, pt.y)
+                        && !yWall.get(pt.x + 1, pt.y)) {
+                        // can place top _ wall at x+1,y
+                        if (debug) {
+                            console.log(`can place top _ wall at x+1,y`);
+                        }
+                        const nextpt = new facetmanagement_3.PathPoint(new point_4.Point(pt.x + 1, pt.y), facetmanagement_3.OrientationEnum.Top);
+                        possibleNextPoints.push(nextpt);
+                    }
+                    // check left upwards
+                    if (pt.y - 1 >= 0 && pt.x - 1 >= 0 // there is a left upwards
+                        && facetResult.facetMap.get(pt.x - 1, pt.y - 1) === f.id // and it belongs to the same facet
+                        && borderMask.get(pt.x - 1, pt.y - 1) // and it's part of the border
+                        && !xWall.get(pt.x - 1 + 1, pt.y - 1) // the right wall isn't set yet
+                        && !xWall.get(pt.x, pt.y) // and the left wall of the current point isn't set yet to prevent |- path
+                    ) {
+                        // can place right | wall at x-1,y-1
+                        if (debug) {
+                            console.log("can place right | wall at x-1,y-1");
+                        }
+                        const nextpt = new facetmanagement_3.PathPoint(new point_4.Point(pt.x - 1, pt.y - 1), facetmanagement_3.OrientationEnum.Right);
+                        possibleNextPoints.push(nextpt);
+                    }
+                    // check right upwards
+                    if (pt.y - 1 >= 0 && pt.x + 1 < facetResult.width // there is a right upwards
+                        && facetResult.facetMap.get(pt.x + 1, pt.y - 1) === f.id // and it belongs to the same facet
+                        && borderMask.get(pt.x + 1, pt.y - 1) // and it's on the border
+                        && !xWall.get(pt.x + 1, pt.y - 1) // and the left wall isn't set yet
+                        && !xWall.get(pt.x + 1, pt.y) // and the right wall of the current point isn't set yet to prevent -| path
+                    ) {
+                        // can place left |  wall at x+1,y-1
+                        if (debug) {
+                            console.log("can place left |  wall at x+1,y-1");
+                        }
+                        const nextpt = new facetmanagement_3.PathPoint(new point_4.Point(pt.x + 1, pt.y - 1), facetmanagement_3.OrientationEnum.Left);
+                        possibleNextPoints.push(nextpt);
+                    }
+                }
+                else if (pt.orientation === facetmanagement_3.OrientationEnum.Right) {
+                    // check rotate to top
+                    if (((pt.y - 1 >= 0
+                        && facetResult.facetMap.get(pt.x, pt.y - 1) !== f.id)
+                        || pt.y - 1 < 0)
+                        && !yWall.get(pt.x, pt.y)) {
+                        // can place top _ wall at x,y
+                        if (debug) {
+                            console.log("can place top _ wall at x,y");
+                        }
+                        const nextpt = new facetmanagement_3.PathPoint(new point_4.Point(pt.x, pt.y), facetmanagement_3.OrientationEnum.Top);
+                        possibleNextPoints.push(nextpt);
+                    }
+                    // check rotate to bottom
+                    if (((pt.y + 1 < facetResult.height
+                        && facetResult.facetMap.get(pt.x, pt.y + 1) !== f.id)
+                        || pt.y + 1 >= facetResult.height)
+                        && !yWall.get(pt.x, pt.y + 1)) {
+                        // can place bottom  _ wall at x,y
+                        if (debug) {
+                            console.log("can place bottom _ wall at x,y");
+                        }
+                        const nextpt = new facetmanagement_3.PathPoint(new point_4.Point(pt.x, pt.y), facetmanagement_3.OrientationEnum.Bottom);
+                        possibleNextPoints.push(nextpt);
+                    }
+                    // check upwards
+                    if (pt.y - 1 >= 0
+                        && facetResult.facetMap.get(pt.x, pt.y - 1) === f.id
+                        && (pt.x + 1 >= facetResult.width || facetResult.facetMap.get(pt.x + 1, pt.y - 1) !== f.id)
+                        && borderMask.get(pt.x, pt.y - 1)
+                        && !xWall.get(pt.x + 1, pt.y - 1)) {
+                        // can place right | wall at x,y-1
+                        if (debug) {
+                            console.log(`can place right | wall at x,y-1`);
+                        }
+                        const nextpt = new facetmanagement_3.PathPoint(new point_4.Point(pt.x, pt.y - 1), facetmanagement_3.OrientationEnum.Right);
+                        possibleNextPoints.push(nextpt);
+                    }
+                    // check downwards
+                    if (pt.y + 1 < facetResult.height
+                        && facetResult.facetMap.get(pt.x, pt.y + 1) === f.id
+                        && (pt.x + 1 >= facetResult.width || facetResult.facetMap.get(pt.x + 1, pt.y + 1) !== f.id)
+                        && borderMask.get(pt.x, pt.y + 1)
+                        && !xWall.get(pt.x + 1, pt.y + 1)) {
+                        // can place right | wall at x,y+1
+                        if (debug) {
+                            console.log("can place right | wall at x,y+1");
+                        }
+                        const nextpt = new facetmanagement_3.PathPoint(new point_4.Point(pt.x, pt.y + 1), facetmanagement_3.OrientationEnum.Right);
+                        possibleNextPoints.push(nextpt);
+                    }
+                    // check right upwards
+                    if (pt.y - 1 >= 0 && pt.x + 1 < facetResult.width // there is a right upwards
+                        && facetResult.facetMap.get(pt.x + 1, pt.y - 1) === f.id // and belongs to the same facet
+                        && borderMask.get(pt.x + 1, pt.y - 1) // and is on the border
+                        && !yWall.get(pt.x + 1, pt.y - 1 + 1) // and the bottom wall isn't set yet
+                        && !yWall.get(pt.x, pt.y) // and the top wall of the current point isn't set to prevent a T shape
+                    ) {
+                        // can place bottom _ wall at x+1,y-1
+                        if (debug) {
+                            console.log("can place bottom _ wall at x+1,y-1");
+                        }
+                        const nextpt = new facetmanagement_3.PathPoint(new point_4.Point(pt.x + 1, pt.y - 1), facetmanagement_3.OrientationEnum.Bottom);
+                        possibleNextPoints.push(nextpt);
+                    }
+                    // check right downwards
+                    if (pt.y + 1 < facetResult.height && pt.x + 1 < facetResult.width // there is a right downwards
+                        && facetResult.facetMap.get(pt.x + 1, pt.y + 1) === f.id // and belongs to the same facet
+                        && borderMask.get(pt.x + 1, pt.y + 1) // and is on the border
+                        && !yWall.get(pt.x + 1, pt.y + 1) // and the top wall isn't visited yet
+                        && !yWall.get(pt.x, pt.y + 1) // and the bottom wall of the current point isn't set to prevent a T shape
+                    ) {
+                        // can place top _ wall at x+1,y+1
+                        if (debug) {
+                            console.log("can place top _ wall at x+1,y+1");
+                        }
+                        const nextpt = new facetmanagement_3.PathPoint(new point_4.Point(pt.x + 1, pt.y + 1), facetmanagement_3.OrientationEnum.Top);
+                        possibleNextPoints.push(nextpt);
+                    }
+                }
+                else if (pt.orientation === facetmanagement_3.OrientationEnum.Bottom) {
+                    // check rotate to left
+                    if (((pt.x - 1 >= 0
+                        && facetResult.facetMap.get(pt.x - 1, pt.y) !== f.id)
+                        || pt.x - 1 < 0)
+                        && !xWall.get(pt.x, pt.y)) {
+                        // can place left | wall at x,y
+                        if (debug) {
+                            console.log("can place left | wall at x,y");
+                        }
+                        const nextpt = new facetmanagement_3.PathPoint(new point_4.Point(pt.x, pt.y), facetmanagement_3.OrientationEnum.Left);
+                        possibleNextPoints.push(nextpt);
+                    }
+                    // check rotate to right
+                    if (((pt.x + 1 < facetResult.width
+                        && facetResult.facetMap.get(pt.x + 1, pt.y) !== f.id)
+                        || pt.x + 1 >= facetResult.width)
+                        && !xWall.get(pt.x + 1, pt.y)) {
+                        // can place right | wall at x,y
+                        if (debug) {
+                            console.log("can place right | wall at x,y");
+                        }
+                        const nextpt = new facetmanagement_3.PathPoint(new point_4.Point(pt.x, pt.y), facetmanagement_3.OrientationEnum.Right);
+                        possibleNextPoints.push(nextpt);
+                    }
+                    // check leftwards
+                    if (pt.x - 1 >= 0
+                        && facetResult.facetMap.get(pt.x - 1, pt.y) === f.id
+                        && (pt.y + 1 >= facetResult.height || facetResult.facetMap.get(pt.x - 1, pt.y + 1) !== f.id)
+                        && borderMask.get(pt.x - 1, pt.y)
+                        && !yWall.get(pt.x - 1, pt.y + 1)) {
+                        // can place bottom _ wall at x-1,y
+                        if (debug) {
+                            console.log(`can place bottom _ wall at x-1,y`);
+                        }
+                        const nextpt = new facetmanagement_3.PathPoint(new point_4.Point(pt.x - 1, pt.y), facetmanagement_3.OrientationEnum.Bottom);
+                        possibleNextPoints.push(nextpt);
+                    }
+                    // check rightwards
+                    if (pt.x + 1 < facetResult.width
+                        && facetResult.facetMap.get(pt.x + 1, pt.y) === f.id
+                        && (pt.y + 1 >= facetResult.height || facetResult.facetMap.get(pt.x + 1, pt.y + 1) !== f.id)
+                        && borderMask.get(pt.x + 1, pt.y)
+                        && !yWall.get(pt.x + 1, pt.y + 1)) {
+                        // can place top _ wall at x+1,y
+                        if (debug) {
+                            console.log(`can place bottom _ wall at x+1,y`);
+                        }
+                        const nextpt = new facetmanagement_3.PathPoint(new point_4.Point(pt.x + 1, pt.y), facetmanagement_3.OrientationEnum.Bottom);
+                        possibleNextPoints.push(nextpt);
+                    }
+                    // check left downwards
+                    if (pt.y + 1 < facetResult.height && pt.x - 1 >= 0 // there is a left downwards
+                        && facetResult.facetMap.get(pt.x - 1, pt.y + 1) === f.id // and it's the same facet
+                        && borderMask.get(pt.x - 1, pt.y + 1) // and it's on the border
+                        && !xWall.get(pt.x - 1 + 1, pt.y + 1) // and the right wall isn't set yet
+                        && !xWall.get(pt.x, pt.y) // and the left wall of the current point isn't set yet to prevent |- path
+                    ) {
+                        // can place right | wall at x-1,y-1
+                        if (debug) {
+                            console.log("can place right | wall at x-1,y+1");
+                        }
+                        const nextpt = new facetmanagement_3.PathPoint(new point_4.Point(pt.x - 1, pt.y + 1), facetmanagement_3.OrientationEnum.Right);
+                        possibleNextPoints.push(nextpt);
+                    }
+                    // check right downwards
+                    if (pt.y + 1 < facetResult.height && pt.x + 1 < facetResult.width // there is a right downwards
+                        && facetResult.facetMap.get(pt.x + 1, pt.y + 1) === f.id // and it's the same facet
+                        && borderMask.get(pt.x + 1, pt.y + 1) // and it's on the border
+                        && !xWall.get(pt.x + 1, pt.y + 1) // and the left wall isn't set yet
+                        && !xWall.get(pt.x + 1, pt.y) // and the right wall of the current point isn't set yet to prevent -| path
+                    ) {
+                        // can place left |  wall at x+1,y+1
+                        if (debug) {
+                            console.log("can place left |  wall at x+1,y+1");
+                        }
+                        const nextpt = new facetmanagement_3.PathPoint(new point_4.Point(pt.x + 1, pt.y + 1), facetmanagement_3.OrientationEnum.Left);
+                        possibleNextPoints.push(nextpt);
+                    }
+                }
+                if (possibleNextPoints.length > 1) {
+                    // TODO it's now not necessary anymore to aggregate all possibilities, the first one is going to be the correct
+                    // selection to trace the entire border, so the if checks above can include a skip once ssible point is found again
+                    pt = possibleNextPoints[0];
+                    FacetBorderTracer.addPointToPath(path, pt, xWall, f, yWall);
+                }
+                else if (possibleNextPoints.length === 1) {
+                    pt = possibleNextPoints[0];
+                    FacetBorderTracer.addPointToPath(path, pt, xWall, f, yWall);
+                }
+                else {
+                    finished = true;
+                }
             }
-            while (xx !== 0 && !visited(xx - 1, yy)) {
-                xx--;
+            // clear up the walls set for the path so the array can be reused
+            for (const pathPoint of path) {
+                switch (pathPoint.orientation) {
+                    case facetmanagement_3.OrientationEnum.Left:
+                        xWall.set(pathPoint.x, pathPoint.y, false);
+                        break;
+                    case facetmanagement_3.OrientationEnum.Top:
+                        yWall.set(pathPoint.x, pathPoint.y, false);
+                        break;
+                    case facetmanagement_3.OrientationEnum.Right:
+                        xWall.set(pathPoint.x + 1, pathPoint.y, false);
+                        break;
+                    case facetmanagement_3.OrientationEnum.Bottom:
+                        yWall.set(pathPoint.x, pathPoint.y + 1, false);
+                        break;
+                }
             }
-            if (xx === ox && yy === oy) {
-                break;
+            return path;
+        }
+        /**
+         * Add a point to the border path and ensure the correct xWall/yWalls is set
+         */
+        static addPointToPath(path, pt, xWall, f, yWall) {
+            path.push(pt);
+            switch (pt.orientation) {
+                case facetmanagement_3.OrientationEnum.Left:
+                    xWall.set(pt.x, pt.y, true);
+                    break;
+                case facetmanagement_3.OrientationEnum.Top:
+                    yWall.set(pt.x, pt.y, true);
+                    break;
+                case facetmanagement_3.OrientationEnum.Right:
+                    xWall.set(pt.x + 1, pt.y, true);
+                    break;
+                case facetmanagement_3.OrientationEnum.Bottom:
+                    yWall.set(pt.x, pt.y + 1, true);
+                    break;
             }
         }
-        fillCore(xx, yy, width, height, visited, setFill);
     }
-    exports.fill = fill;
-    function fillCore(x, y, width, height, visited, setFill) {
-        // at this point, we know that array[y,x] is clear, and array[y-1,x] and array[y,x-1] are set.
-        // we'll begin scanning down and to the right, attempting to fill an entire rectangular block
-        let lastRowLength = 0; // the number of cells that were clear in the last row we scanned
-        do {
-            let rowLength = 0;
-            let sx = x; // keep track of how long this row is. sx is the starting x for the main scan below
-            // now we want to handle a case like |***|, where we fill 3 cells in the first row and then after we move to
-            // the second row we find the first  | **| cell is filled, ending our rectangular scan. rather than handling
-            // this via the recursion below, we'll increase the starting value of 'x' and reduce the last row length to
-            // match. then we'll continue trying to set the narrower rectangular block
-            if (lastRowLength !== 0 && visited(x, y)) {
-                do {
-                    if (--lastRowLength === 0) {
-                        return;
-                    } // shorten the row. if it's full, we're done
-                } while (visited(++x, y)); // otherwise, update the starting point of the main scan to match
-                sx = x;
-            }
-            else {
-                for (; x !== 0 && !visited(x - 1, y); rowLength++, lastRowLength++) {
-                    x--;
-                    setFill(x, y); // to avoid scanning the cells twice, we'll fill them and update rowLength here
-                    // if there's something above the new starting point, handle that recursively. this deals with cases
-                    // like |* **| when we begin filling from (2,0), move down to (2,1), and then move left to (0,1).
-                    // the  |****| main scan assumes the portion of the previous row from x to x+lastRowLength has already
-                    // been filled. adjusting x and lastRowLength breaks that assumption in this case, so we must fix it
-                    if (y !== 0 && !visited(x, y - 1)) {
-                        fill(x, y - 1, width, height, visited, setFill);
-                    } // use _Fill since there may be more up and left
-                }
-            }
-            // now at this point we can begin to scan the current row in the rectangular block. the span of the previous
-            // row from x (inclusive) to x+lastRowLength (exclusive) has already been filled, so we don't need to
-            // check it. so scan across to the right in the current row
-            for (; sx < width && !visited(sx, y); rowLength++, sx++) {
-                setFill(sx, y);
-            }
-            // now we've scanned this row. if the block is rectangular, then the previous row has already been scanned,
-            // so we don't need to look upwards and we're going to scan the next row in the next iteration so we don't
-            // need to look downwards. however, if the block is not rectangular, we may need to look upwards or rightwards
-            // for some portion of the row. if this row was shorter than the last row, we may need to look rightwards near
-            // the end, as in the case of |*****|, where the first row is 5 cells long and the second row is 3 cells long.
-            // we must look to the right  |*** *| of the single cell at the end of the second row, i.e. at (4,1)
-            if (rowLength < lastRowLength) {
-                for (const end = x + lastRowLength; ++sx < end;) { // there. any clear cells would have been connected to the previous
-                    if (!visited(sx, y)) {
-                        fillCore(sx, y, width, height, visited, setFill);
-                    } // row. the cells up and left must be set so use FillCore
-                }
-            }
-            else if (rowLength > lastRowLength && y !== 0) {
-                for (let ux = x + lastRowLength; ++ux < sx;) {
-                    if (!visited(ux, y - 1)) {
-                        fill(ux, y - 1, width, height, visited, setFill);
-                    } // since there may be clear cells up and left, use _Fill
-                }
-            }
-            lastRowLength = rowLength; // record the new row length
-        } while (lastRowLength !== 0 && ++y < height); // if we get to a full row or to the bottom, we're done
-    }
+    exports.FacetBorderTracer = FacetBorderTracer;
 });
 define("lib/datastructs", ["require", "exports"], function (require, exports) {
     "use strict";
@@ -1003,1383 +2395,9 @@ define("lib/polylabel", ["require", "exports", "lib/datastructs"], function (req
         return new Cell(x / area, y / area, 0, polygon);
     }
 });
-define("structs/boundingbox", ["require", "exports"], function (require, exports) {
+define("facetLabelPlacer", ["require", "exports", "common", "lib/polylabel", "structs/boundingbox", "facetCreator"], function (require, exports, common_6, polylabel_1, boundingbox_2, facetCreator_2) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    class BoundingBox {
-        constructor() {
-            this.minX = Number.MAX_VALUE;
-            this.minY = Number.MAX_VALUE;
-            this.maxX = Number.MIN_VALUE;
-            this.maxY = Number.MIN_VALUE;
-        }
-        get width() {
-            return this.maxX - this.minX + 1;
-        }
-        get height() {
-            return this.maxY - this.minY + 1;
-        }
-    }
-    exports.BoundingBox = BoundingBox;
-});
-define("structs/point", ["require", "exports"], function (require, exports) {
-    "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
-    class Point {
-        constructor(x, y) {
-            this.x = x;
-            this.y = y;
-        }
-        distanceTo(pt) {
-            // don't do euclidean because then neighbours should be diagonally as well
-            // because sqrt(2) < 2
-            //  return Math.sqrt((pt.x - this.x) * (pt.x - this.x) + (pt.y - this.y) * (pt.y - this.y));
-            return Math.abs(pt.x - this.x) + Math.abs(pt.y - this.y);
-        }
-        distanceToCoord(x, y) {
-            // don't do euclidean because then neighbours should be diagonally as well
-            // because sqrt(2) < 2
-            //  return Math.sqrt((pt.x - this.x) * (pt.x - this.x) + (pt.y - this.y) * (pt.y - this.y));
-            return Math.abs(x - this.x) + Math.abs(y - this.y);
-        }
-    }
-    exports.Point = Point;
-});
-define("facetmanagement", ["require", "exports", "common", "lib/fill", "lib/polylabel", "structs/boundingbox", "structs/point", "structs/typedarrays"], function (require, exports, common_2, fill_1, polylabel_1, boundingbox_1, point_1, typedarrays_2) {
-    "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
-    var OrientationEnum;
-    (function (OrientationEnum) {
-        OrientationEnum[OrientationEnum["Left"] = 0] = "Left";
-        OrientationEnum[OrientationEnum["Top"] = 1] = "Top";
-        OrientationEnum[OrientationEnum["Right"] = 2] = "Right";
-        OrientationEnum[OrientationEnum["Bottom"] = 3] = "Bottom";
-    })(OrientationEnum || (OrientationEnum = {}));
-    /**
-     * PathPoint is a point with an orientation that indicates which wall border is set
-     */
-    class PathPoint extends point_1.Point {
-        constructor(pt, orientation) {
-            super(pt.x, pt.y);
-            this.orientation = orientation;
-        }
-        getWallX() {
-            let x = this.x;
-            if (this.orientation === OrientationEnum.Left) {
-                x -= 0.5;
-            }
-            else if (this.orientation === OrientationEnum.Right) {
-                x += 0.5;
-            }
-            return x;
-        }
-        getWallY() {
-            let y = this.y;
-            if (this.orientation === OrientationEnum.Top) {
-                y -= 0.5;
-            }
-            else if (this.orientation === OrientationEnum.Bottom) {
-                y += 0.5;
-            }
-            return y;
-        }
-        getNeighbour(facetResult) {
-            switch (this.orientation) {
-                case OrientationEnum.Left:
-                    if (this.x - 1 >= 0) {
-                        return facetResult.facetMap.get(this.x - 1, this.y);
-                    }
-                    break;
-                case OrientationEnum.Right:
-                    if (this.x + 1 < facetResult.width) {
-                        return facetResult.facetMap.get(this.x + 1, this.y);
-                    }
-                    break;
-                case OrientationEnum.Top:
-                    if (this.y - 1 >= 0) {
-                        return facetResult.facetMap.get(this.x, this.y - 1);
-                    }
-                    break;
-                case OrientationEnum.Bottom:
-                    if (this.y + 1 < facetResult.height) {
-                        return facetResult.facetMap.get(this.x, this.y + 1);
-                    }
-                    break;
-            }
-            return -1;
-        }
-        toString() {
-            return this.x + "," + this.y + " " + this.orientation;
-        }
-    }
-    /**
-     *  Path segment is a segment of a border path that is adjacent to a specific neighbour facet
-     */
-    class PathSegment {
-        constructor(points, neighbour) {
-            this.points = points;
-            this.neighbour = neighbour;
-        }
-    }
-    /**
-     * Facet boundary segment describes the matched segment that is shared between 2 facets
-     * When 2 segments are matched, one will be the original segment and the other one is removed
-     * This ensures that all facets share the same segments, but sometimes in reverse order to ensure
-     * the correct continuity of its entire oborder path
-     */
-    class FacetBoundarySegment {
-        constructor(originalSegment, neighbour, reverseOrder) {
-            this.originalSegment = originalSegment;
-            this.neighbour = neighbour;
-            this.reverseOrder = reverseOrder;
-        }
-    }
-    /**
-     *  A facet that represents an area of pixels of the same color
-     */
-    class Facet {
-        constructor() {
-            this.pointCount = 0;
-            /**
-             * Flag indicating if the neighbourfacets array is dirty. If it is, the neighbourfacets *have* to be rebuild
-             * Before it can be used. This is useful to defer the rebuilding of the array until it's actually needed
-             * and can remove a lot of duplicate building of the array because multiple facets were hitting the same neighbour
-             * (over 50% on test images)
-             */
-            this.neighbourFacetsIsDirty = false;
-        }
-        getFullPathFromBorderSegments(useWalls) {
-            const newpath = [];
-            const addPoint = (pt) => {
-                if (useWalls) {
-                    newpath.push(new point_1.Point(pt.getWallX(), pt.getWallY()));
-                }
-                else {
-                    newpath.push(new point_1.Point(pt.x, pt.y));
-                }
-            };
-            let lastSegment = null;
-            for (const seg of this.borderSegments) {
-                // fix for the continuitity of the border segments. If transition points between border segments on the path aren't repeated, the 
-                // borders of the facets aren't always matching up leaving holes when rendered
-                if (lastSegment != null) {
-                    if (lastSegment.reverseOrder) {
-                        addPoint(lastSegment.originalSegment.points[0]);
-                    }
-                    else {
-                        addPoint(lastSegment.originalSegment.points[lastSegment.originalSegment.points.length - 1]);
-                    }
-                }
-                if (seg.reverseOrder) {
-                    for (let i = seg.originalSegment.points.length - 1; i >= 0; i--) {
-                        addPoint(seg.originalSegment.points[i]);
-                    }
-                }
-                else {
-                    for (let i = 0; i < seg.originalSegment.points.length; i++) {
-                        addPoint(seg.originalSegment.points[i]);
-                    }
-                }
-                lastSegment = seg;
-            }
-            return newpath;
-        }
-    }
-    /**
-     *  Result of the facet construction, both as a map and as an array.
-     *  Facets in the array can be null when they've been deleted
-     */
-    class FacetResult {
-    }
-    exports.FacetResult = FacetResult;
-    class FacetCreator {
-        /**
-         *  Constructs the facets with its border points for each area of pixels of the same color
-         */
-        static getFacets(width, height, imgColorIndices, onUpdate = null) {
-            return __awaiter(this, void 0, void 0, function* () {
-                const result = new FacetResult();
-                result.width = width;
-                result.height = height;
-                // setup visited mask
-                const visited = new typedarrays_2.BooleanArray2D(result.width, result.height);
-                // setup facet map & array
-                result.facetMap = new typedarrays_2.Uint32Array2D(result.width, result.height);
-                result.facets = [];
-                // depth first traversal to find the different facets
-                let count = 0;
-                for (let j = 0; j < result.height; j++) {
-                    for (let i = 0; i < result.width; i++) {
-                        const colorIndex = imgColorIndices.get(i, j);
-                        if (!visited.get(i, j)) {
-                            const facetIndex = result.facets.length;
-                            // build a facet starting at point i,j
-                            const facet = FacetCreator.buildFacet(facetIndex, colorIndex, i, j, visited, imgColorIndices, result);
-                            result.facets.push(facet);
-                            if (count % 100 === 0) {
-                                yield common_2.delay(0);
-                                if (onUpdate != null) {
-                                    onUpdate(count / (result.width * result.height));
-                                }
-                            }
-                        }
-                        count++;
-                    }
-                }
-                yield common_2.delay(0);
-                // fill in the neighbours of all facets by checking the neighbours of the border points
-                for (const f of result.facets) {
-                    if (f != null) {
-                        FacetCreator.buildFacetNeighbour(f, result);
-                    }
-                }
-                if (onUpdate != null) {
-                    onUpdate(1);
-                }
-                return result;
-            });
-        }
-        /**
-         *  Builds a facet at given x,y using depth first search to visit all pixels of the same color
-         */
-        static buildFacet(facetIndex, facetColorIndex, x, y, visited, imgColorIndices, facetResult) {
-            const facet = new Facet();
-            facet.id = facetIndex;
-            facet.color = facetColorIndex;
-            facet.bbox = new boundingbox_1.BoundingBox();
-            facet.borderPoints = [];
-            fill_1.fill(x, y, facetResult.width, facetResult.height, (ptx, pty) => visited.get(ptx, pty) || imgColorIndices.get(ptx, pty) !== facetColorIndex, (ptx, pty) => {
-                visited.set(ptx, pty, true);
-                facetResult.facetMap.set(ptx, pty, facetIndex);
-                facet.pointCount++;
-                // determine if the point is a border or not
-                /*  const isInnerPoint = (ptx - 1 >= 0 && imgColorIndices.get(ptx - 1, pty) === facetColorIndex) &&
-                      (pty - 1 >= 0 && imgColorIndices.get(ptx, pty - 1) === facetColorIndex) &&
-                      (ptx + 1 < facetResult.width && imgColorIndices.get(ptx + 1, pty) === facetColorIndex) &&
-                      (pty + 1 < facetResult.height && imgColorIndices.get(ptx, pty + 1) === facetColorIndex);
-                */
-                const isInnerPoint = imgColorIndices.matchAllAround(ptx, pty, facetColorIndex);
-                if (!isInnerPoint) {
-                    facet.borderPoints.push(new point_1.Point(ptx, pty));
-                }
-                // update bounding box of facet
-                if (ptx > facet.bbox.maxX) {
-                    facet.bbox.maxX = ptx;
-                }
-                if (pty > facet.bbox.maxY) {
-                    facet.bbox.maxY = pty;
-                }
-                if (ptx < facet.bbox.minX) {
-                    facet.bbox.minX = ptx;
-                }
-                if (pty < facet.bbox.minY) {
-                    facet.bbox.minY = pty;
-                }
-            });
-            /*
-               // using a 1D flattened stack (x*width+y), we can avoid heap allocations of Point objects, which halves the garbage collection time
-             let stack: number[] = [];
-             stack.push(y * facetResult.width + x);
-    
-             while (stack.length > 0) {
-                 let pt = stack.pop()!;
-                 let ptx = pt % facetResult.width;
-                 let pty = Math.floor(pt / facetResult.width);
-    
-                 // if the point wasn't visited before and matches
-                 // the same color
-                 if (!visited.get(ptx, pty) &&
-                     imgColorIndices.get(ptx, pty) == facetColorIndex) {
-    
-                     visited.set(ptx, pty, true);
-                     facetResult.facetMap.set(ptx, pty, facetIndex);
-                     facet.pointCount++;
-    
-                     // determine if the point is a border or not
-                     let isInnerPoint = (ptx - 1 >= 0 && imgColorIndices.get(ptx - 1, pty) == facetColorIndex) &&
-                         (pty - 1 >= 0 && imgColorIndices.get(ptx, pty - 1) == facetColorIndex) &&
-                         (ptx + 1 < facetResult.width && imgColorIndices.get(ptx + 1, pty) == facetColorIndex) &&
-                         (pty + 1 < facetResult.height && imgColorIndices.get(ptx, pty + 1) == facetColorIndex);
-    
-                     if (!isInnerPoint)
-                         facet.borderPoints.push(new Point(ptx, pty));
-    
-                     // update bounding box of facet
-                     if (ptx > facet.bbox.maxX) facet.bbox.maxX = ptx;
-                     if (pty > facet.bbox.maxY) facet.bbox.maxY = pty;
-                     if (ptx < facet.bbox.minX) facet.bbox.minX = ptx;
-                     if (pty < facet.bbox.minY) facet.bbox.minY = pty;
-    
-                     // visit direct adjacent points
-                     if (ptx - 1 >= 0 && !visited.get(ptx - 1, pty))
-                         stack.push(pty * facetResult.width + (ptx - 1)); //stack.push(new Point(pt.x - 1, pt.y));
-                     if (pty - 1 >= 0 && !visited.get(ptx, pty - 1))
-                         stack.push((pty - 1) * facetResult.width + ptx); //stack.push(new Point(pt.x, pt.y - 1));
-                     if (ptx + 1 < facetResult.width && !visited.get(ptx + 1, pty))
-                         stack.push(pty * facetResult.width + (ptx + 1));//stack.push(new Point(pt.x + 1, pt.y));
-                     if (pty + 1 < facetResult.height && !visited.get(ptx, pty + 1))
-                         stack.push((pty + 1) * facetResult.width + ptx); //stack.push(new Point(pt.x, pt.y + 1));
-                 }
-             }
-             */
-            return facet;
-        }
-        /**
-         * Check which neighbour facets the given facet has by checking the neighbour facets at each border point
-         */
-        static buildFacetNeighbour(facet, facetResult) {
-            facet.neighbourFacets = [];
-            const uniqueFacets = {}; // poor man's set
-            for (const pt of facet.borderPoints) {
-                if (pt.x - 1 >= 0) {
-                    const leftFacetId = facetResult.facetMap.get(pt.x - 1, pt.y);
-                    if (leftFacetId !== facet.id) {
-                        uniqueFacets[leftFacetId] = true;
-                    }
-                }
-                if (pt.y - 1 >= 0) {
-                    const topFacetId = facetResult.facetMap.get(pt.x, pt.y - 1);
-                    if (topFacetId !== facet.id) {
-                        uniqueFacets[topFacetId] = true;
-                    }
-                }
-                if (pt.x + 1 < facetResult.width) {
-                    const rightFacetId = facetResult.facetMap.get(pt.x + 1, pt.y);
-                    if (rightFacetId !== facet.id) {
-                        uniqueFacets[rightFacetId] = true;
-                    }
-                }
-                if (pt.y + 1 < facetResult.height) {
-                    const bottomFacetId = facetResult.facetMap.get(pt.x, pt.y + 1);
-                    if (bottomFacetId !== facet.id) {
-                        uniqueFacets[bottomFacetId] = true;
-                    }
-                }
-            }
-            for (const k of Object.keys(uniqueFacets)) {
-                if (uniqueFacets.hasOwnProperty(k)) {
-                    facet.neighbourFacets.push(parseInt(k));
-                }
-            }
-            // the neighbour array is updated so it's not dirty anymore
-            facet.neighbourFacetsIsDirty = false;
-        }
-    }
-    exports.FacetCreator = FacetCreator;
-    class FacetReducer {
-        /**
-         *  Remove all facets that have a pointCount smaller than the given number.
-         */
-        static reduceFacets(smallerThan, removeFacetsFromLargeToSmall, colorsByIndex, facetResult, imgColorIndices, onUpdate = null) {
-            return __awaiter(this, void 0, void 0, function* () {
-                let count = 0;
-                const visitedCache = new typedarrays_2.BooleanArray2D(facetResult.width, facetResult.height);
-                // build the color distance matrix, which describes the distance of each color to each other
-                const colorDistances = FacetReducer.buildColorDistanceMatrix(colorsByIndex);
-                // process facets from large to small. This results in better consistency with the original image
-                // because the small facets act as boundary for the large merges keeping them mostly in place of where they should remain
-                // then afterwards the smaller ones are deleted which will just end up completely isolated and thus entirely replaced
-                // with the outer facet. But then again, what do I know, I'm just a comment.
-                const facetProcessingOrder = facetResult.facets.filter((f) => f != null).slice(0).sort((a, b) => b.pointCount > a.pointCount ? 1 : (b.pointCount < a.pointCount ? -1 : 0)).map((f) => f.id);
-                if (!removeFacetsFromLargeToSmall) {
-                    facetProcessingOrder.reverse();
-                }
-                let curTime = new Date().getTime();
-                for (let fidx = 0; fidx < facetProcessingOrder.length; fidx++) {
-                    const f = facetResult.facets[facetProcessingOrder[fidx]];
-                    // facets can be removed by merging by others due to a previous facet deletion
-                    if (f != null && f.pointCount < smallerThan) {
-                        const facetToRemove = f;
-                        FacetReducer.deleteFacet(facetToRemove, facetResult, imgColorIndices, colorDistances, visitedCache);
-                        if (new Date().getTime() - curTime > 500) {
-                            curTime = new Date().getTime();
-                            yield common_2.delay(0);
-                            if (onUpdate != null) {
-                                onUpdate(fidx / facetProcessingOrder.length);
-                            }
-                        }
-                    }
-                    count++;
-                }
-                if (onUpdate != null) {
-                    onUpdate(1);
-                }
-            });
-        }
-        /**
-         * Deletes a facet. All points belonging to the facet are moved to the nearest neighbour facet
-         * based on the distance of the neighbour border points. This results in a voronoi like filling in of the
-         * void the deletion made
-         */
-        static deleteFacet(facetToRemove, facetResult, imgColorIndices, colorDistances, visitedArrayCache) {
-            // there are many small facets, it's faster to just iterate over all points within its bounding box
-            // and seeing which belong to the facet than to keep track of the inner points (along with the border points)
-            // per facet, because that generates a lot of extra heap objects that need to be garbage collected each time
-            // a facet is rebuilt
-            for (let j = facetToRemove.bbox.minY; j <= facetToRemove.bbox.maxY; j++) {
-                for (let i = facetToRemove.bbox.minX; i <= facetToRemove.bbox.maxX; i++) {
-                    if (facetResult.facetMap.get(i, j) === facetToRemove.id) {
-                        let closestNeighbour = -1;
-                        let minDistance = Number.MAX_VALUE;
-                        let minColorDistance = Number.MAX_VALUE;
-                        // ensure the neighbour facets is up to date if it was marked as dirty
-                        if (facetToRemove.neighbourFacetsIsDirty) {
-                            FacetCreator.buildFacetNeighbour(facetToRemove, facetResult);
-                        }
-                        // determine which neighbour will receive the current point based on the distance, and if there are more with the same
-                        // distance, then take the neighbour with the closes color
-                        for (const neighbourIdx of facetToRemove.neighbourFacets) {
-                            const neighbour = facetResult.facets[neighbourIdx];
-                            if (neighbour != null) {
-                                for (const bpt of neighbour.borderPoints) {
-                                    const distance = bpt.distanceToCoord(i, j);
-                                    if (distance < minDistance) {
-                                        minDistance = distance;
-                                        closestNeighbour = neighbourIdx;
-                                        minColorDistance = Number.MAX_VALUE; // reset color distance
-                                    }
-                                    else if (distance === minDistance) {
-                                        // if the distance is equal as the min distance
-                                        // then see if the neighbour's color is closer to the current color
-                                        // note: this causes morepoints to be reallocated to different neighbours
-                                        // in the sanity check later, but still yields a better visual result
-                                        const colorDistance = colorDistances[facetToRemove.color][neighbour.color];
-                                        if (colorDistance < minColorDistance) {
-                                            minColorDistance = colorDistance;
-                                            closestNeighbour = neighbourIdx;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        // copy over color of closest neighbour
-                        imgColorIndices.set(i, j, facetResult.facets[closestNeighbour].color);
-                    }
-                }
-            }
-            // Rebuild all the neighbour facets that have been changed. While it could probably be faster by just adding the points manually
-            // to the facet map and determine if the border points are still valid, it's more complex than that. It's possible that due to the change in points
-            // that 2 neighbours of the same colors have become linked and need to merged as well. So it's easier to just rebuild the entire facet
-            FacetReducer.rebuildChangedFacets(visitedArrayCache, facetToRemove, imgColorIndices, facetResult);
-            // sanity check: make sure that all points have been replaced by neighbour facets. It's possible that some points will have
-            // been left out because there is no continuity with the neighbour points
-            // this occurs for diagonal points to the neighbours and more often when the closest
-            // color is chosen when distances are equal.
-            // It's probably possible to enforce that this will never happen in the above code but
-            // this is a constraint that is expensive to enforce and doesn't happen all that much
-            // so instead try and merge if with any of its direct neighbours if possible
-            let needsToRebuild = false;
-            for (let y = facetToRemove.bbox.minY; y <= facetToRemove.bbox.maxY; y++) {
-                for (let x = facetToRemove.bbox.minX; x <= facetToRemove.bbox.maxX; x++) {
-                    if (facetResult.facetMap.get(x, y) === facetToRemove.id) {
-                        console.warn(`Point ${x},${y} was reallocated to neighbours for facet ${facetToRemove.id} deletion`);
-                        needsToRebuild = true;
-                        if (x - 1 >= 0 && facetResult.facetMap.get(x - 1, y) !== facetToRemove.id && facetResult.facets[facetResult.facetMap.get(x - 1, y)] !== null) {
-                            imgColorIndices.set(x, y, facetResult.facets[facetResult.facetMap.get(x - 1, y)].color);
-                        }
-                        else if (y - 1 >= 0 && facetResult.facetMap.get(x, y - 1) !== facetToRemove.id && facetResult.facets[facetResult.facetMap.get(x, y - 1)] !== null) {
-                            imgColorIndices.set(x, y, facetResult.facets[facetResult.facetMap.get(x, y - 1)].color);
-                        }
-                        else if (x + 1 < facetResult.width && facetResult.facetMap.get(x + 1, y) !== facetToRemove.id && facetResult.facets[facetResult.facetMap.get(x + 1, y)] !== null) {
-                            imgColorIndices.set(x, y, facetResult.facets[facetResult.facetMap.get(x + 1, y)].color);
-                        }
-                        else if (y + 1 < facetResult.height && facetResult.facetMap.get(x, y + 1) !== facetToRemove.id && facetResult.facets[facetResult.facetMap.get(x, y + 1)] !== null) {
-                            imgColorIndices.set(x, y, facetResult.facets[facetResult.facetMap.get(x, y + 1)].color);
-                        }
-                        else {
-                            console.error(`Unable to reallocate point ${x},${y}`);
-                        }
-                    }
-                }
-            }
-            // now we need to go through the thing again to build facets and update the neighbours
-            if (needsToRebuild) {
-                FacetReducer.rebuildChangedFacets(visitedArrayCache, facetToRemove, imgColorIndices, facetResult);
-            }
-            // now mark the facet to remove as deleted
-            facetResult.facets[facetToRemove.id] = null;
-        }
-        /**
-         *  Rebuilds the given changed facets
-         */
-        static rebuildChangedFacets(visitedArrayCache, facetToRemove, imgColorIndices, facetResult) {
-            const changedNeighboursSet = {};
-            if (facetToRemove.neighbourFacetsIsDirty) {
-                FacetCreator.buildFacetNeighbour(facetToRemove, facetResult);
-            }
-            for (const neighbourIdx of facetToRemove.neighbourFacets) {
-                const neighbour = facetResult.facets[neighbourIdx];
-                if (neighbour != null) {
-                    // re-evaluate facet
-                    // track all the facets that needs to have their neighbour list updated
-                    changedNeighboursSet[neighbourIdx] = true;
-                    if (neighbour.neighbourFacetsIsDirty) {
-                        FacetCreator.buildFacetNeighbour(neighbour, facetResult);
-                    }
-                    for (const n of neighbour.neighbourFacets) {
-                        changedNeighboursSet[n] = true;
-                    }
-                    // rebuild the neighbour facet
-                    const newFacet = FacetCreator.buildFacet(neighbourIdx, neighbour.color, neighbour.borderPoints[0].x, neighbour.borderPoints[0].y, visitedArrayCache, imgColorIndices, facetResult);
-                    facetResult.facets[neighbourIdx] = newFacet;
-                    // it's possible that any of the neighbour facets are now overlapping
-                    // because if for example facet Red - Green - Red, Green is removed
-                    // then it will become Red - Red and both facets will overlap
-                    // this means the facet will have 0 points remaining
-                    if (newFacet.pointCount === 0) {
-                        // remove the empty facet as well
-                        facetResult.facets[neighbourIdx] = null;
-                    }
-                }
-            }
-            // reset the visited array for all neighbours
-            // while the visited array could be recreated per facet to remove, it's quite big and introduces
-            // a lot of allocation / cleanup overhead. Due to the size of the facets it's usually faster
-            // to just flag every point of the facet as false again
-            if (facetToRemove.neighbourFacetsIsDirty) {
-                FacetCreator.buildFacetNeighbour(facetToRemove, facetResult);
-            }
-            for (const neighbourIdx of facetToRemove.neighbourFacets) {
-                const neighbour = facetResult.facets[neighbourIdx];
-                if (neighbour != null) {
-                    for (let y = neighbour.bbox.minY; y <= neighbour.bbox.maxY; y++) {
-                        for (let x = neighbour.bbox.minX; x <= neighbour.bbox.maxX; x++) {
-                            if (facetResult.facetMap.get(x, y) === neighbour.id) {
-                                visitedArrayCache.set(x, y, false);
-                            }
-                        }
-                    }
-                }
-            }
-            // rebuild neighbour array for affected neighbours
-            for (const k of Object.keys(changedNeighboursSet)) {
-                if (changedNeighboursSet.hasOwnProperty(k)) {
-                    const neighbourIdx = parseInt(k);
-                    const f = facetResult.facets[neighbourIdx];
-                    if (f != null) {
-                        // it's a lot faster when deferring the neighbour array updates
-                        // because a lot of facets that are deleted share the same facet neighbours
-                        // and removing the unnecessary neighbour array checks until they it's needed
-                        // speeds things up significantly
-                        // FacetCreator.buildFacetNeighbour(f, facetResult);
-                        f.neighbourFacets = null;
-                        f.neighbourFacetsIsDirty = true;
-                    }
-                }
-            }
-        }
-        /**
-         *  Builds a distance matrix for each color to each other
-         */
-        static buildColorDistanceMatrix(colorsByIndex) {
-            const colorDistances = new Array(colorsByIndex.length);
-            for (let j = 0; j < colorsByIndex.length; j++) {
-                colorDistances[j] = new Array(colorDistances.length);
-            }
-            for (let j = 0; j < colorsByIndex.length; j++) {
-                for (let i = j; i < colorsByIndex.length; i++) {
-                    const c1 = colorsByIndex[j];
-                    const c2 = colorsByIndex[i];
-                    const distance = Math.sqrt((c1[0] - c2[0]) * (c1[0] - c2[0]) +
-                        (c1[1] - c2[1]) * (c1[1] - c2[1]) +
-                        (c1[2] - c2[2]) * (c1[2] - c2[2]));
-                    colorDistances[i][j] = distance;
-                    colorDistances[j][i] = distance;
-                }
-            }
-            return colorDistances;
-        }
-    }
-    exports.FacetReducer = FacetReducer;
-    class FacetBorderTracer {
-        /**
-         *  Traces the border path of the facet from the facet border points.
-         *  Imagine placing walls around the outer side of the border points.
-         */
-        static buildFacetBorderPaths(facetResult, onUpdate = null) {
-            return __awaiter(this, void 0, void 0, function* () {
-                let count = 0;
-                const borderMask = new typedarrays_2.BooleanArray2D(facetResult.width, facetResult.height);
-                // sort by biggest facets first
-                const facetProcessingOrder = facetResult.facets.filter((f) => f != null).slice(0).sort((a, b) => b.pointCount > a.pointCount ? 1 : (b.pointCount < a.pointCount ? -1 : 0)).map((f) => f.id);
-                for (let fidx = 0; fidx < facetProcessingOrder.length; fidx++) {
-                    const f = facetResult.facets[facetProcessingOrder[fidx]];
-                    if (f != null) {
-                        for (const bp of f.borderPoints) {
-                            borderMask.set(bp.x, bp.y, true);
-                        }
-                        // keep track of which walls are already set on each pixel
-                        // e.g. xWall.get(x,y) is the left wall of point x,y
-                        // as the left wall of (x+1,y) and right wall of (x,y) is the same
-                        // the right wall of x,y can be set with xWall.set(x+1,y).
-                        // Analogous for the horizontal walls in yWall
-                        const xWall = new typedarrays_2.BooleanArray2D(facetResult.width + 1, facetResult.height + 1);
-                        const yWall = new typedarrays_2.BooleanArray2D(facetResult.width + 1, facetResult.height + 1);
-                        // the first border point will guaranteed be one of the outer ones because
-                        // it will be the first point that is encountered of the facet when building
-                        // them in buildFacet with DFS.
-                        // --> Or so I thought, which is apparently not the case in rare circumstances
-                        // sooooo go look for a border that edges with the bounding box, this is definitely
-                        // on the outer side then.
-                        let borderStartIndex = -1;
-                        for (let i = 0; i < f.borderPoints.length; i++) {
-                            if ((f.borderPoints[i].x === f.bbox.minX || f.borderPoints[i].x === f.bbox.maxX) ||
-                                (f.borderPoints[i].y === f.bbox.minY || f.borderPoints[i].y === f.bbox.maxY)) {
-                                borderStartIndex = i;
-                                break;
-                            }
-                        }
-                        // determine the starting point orientation (the outside of facet)
-                        const pt = new PathPoint(f.borderPoints[borderStartIndex], OrientationEnum.Left);
-                        // L T R B
-                        if (pt.x - 1 < 0 || facetResult.facetMap.get(pt.x - 1, pt.y) !== f.id) {
-                            pt.orientation = OrientationEnum.Left;
-                        }
-                        else if (pt.y - 1 < 0 || facetResult.facetMap.get(pt.x, pt.y - 1) !== f.id) {
-                            pt.orientation = OrientationEnum.Top;
-                        }
-                        else if (pt.x + 1 >= facetResult.width || facetResult.facetMap.get(pt.x + 1, pt.y) !== f.id) {
-                            pt.orientation = OrientationEnum.Right;
-                        }
-                        else if (pt.y + 1 >= facetResult.height || facetResult.facetMap.get(pt.x, pt.y + 1) !== f.id) {
-                            pt.orientation = OrientationEnum.Bottom;
-                        }
-                        // build a border path from that point
-                        const path = FacetBorderTracer.getPath(pt, facetResult, f, borderMask, xWall, yWall);
-                        f.borderPath = path;
-                        if (count % 100 === 0) {
-                            yield common_2.delay(0);
-                            if (onUpdate != null) {
-                                onUpdate(fidx / facetProcessingOrder.length);
-                            }
-                        }
-                    }
-                    count++;
-                }
-                if (onUpdate != null) {
-                    onUpdate(1);
-                }
-            });
-        }
-        /**
-         * Returns a border path starting from the given point
-         */
-        static getPath(pt, facetResult, f, borderMask, xWall, yWall) {
-            const debug = false;
-            let finished = false;
-            const count = 0;
-            const path = [];
-            FacetBorderTracer.addPointToPath(path, pt, xWall, f, yWall);
-            // check rotations first, then straight along the ouside and finally diagonally
-            // this ensures that bends are always taken as tight as possible
-            // so it doesn't skip border points to later loop back to and get stuck (hopefully)
-            while (!finished) {
-                if (debug) {
-                    console.log(pt.x + " " + pt.y + " " + pt.orientation);
-                }
-                // yes, technically i could do some trickery to only get the left/top cases
-                // by shifting the pixels but that means some more shenanigans in correct order of things
-                // so whatever. (And yes I tried it but it wasn't worth the debugging hell that ensued)
-                const possibleNextPoints = [];
-                //   +---+---+
-                //   |  <|   |
-                //   +---+---+
-                if (pt.orientation === OrientationEnum.Left) {
-                    // check rotate to top
-                    //   +---+---+
-                    //   |   |   |
-                    //   +---xnnnn (x = old wall, n = new wall, F = current facet x,y)
-                    //   |   x F |
-                    //   +---x---+
-                    if (((pt.y - 1 >= 0 && facetResult.facetMap.get(pt.x, pt.y - 1) !== f.id) // top exists and is a neighbour facet
-                        || pt.y - 1 < 0) // or top doesn't exist, which is the boundary of the image
-                        && !yWall.get(pt.x, pt.y)) { // and the wall isn't set yet
-                        // can place top _ wall at x,y
-                        if (debug) {
-                            console.log("can place top _ wall at x,y");
-                        }
-                        const nextpt = new PathPoint(new point_1.Point(pt.x, pt.y), OrientationEnum.Top);
-                        possibleNextPoints.push(nextpt);
-                    }
-                    // check rotate to bottom
-                    //   +---+---+
-                    //   |   |   |
-                    //   +---x---+ (x = old wall, n = new wall, F = current facet x,y)
-                    //   |   x F |
-                    //   +---xnnnn
-                    if (((pt.y + 1 < facetResult.height && facetResult.facetMap.get(pt.x, pt.y + 1) !== f.id) // bottom exists and is a neighbour facet
-                        || pt.y + 1 >= facetResult.height) // or bottom doesn't exist, which is the boundary of the image
-                        && !yWall.get(pt.x, pt.y + 1)) { // and the wall isn't set yet
-                        // can place bottom  _ wall at x,y
-                        if (debug) {
-                            console.log("can place bottom _ wall at x,y");
-                        }
-                        const nextpt = new PathPoint(new point_1.Point(pt.x, pt.y), OrientationEnum.Bottom);
-                        possibleNextPoints.push(nextpt);
-                    }
-                    // check upwards
-                    //   +---n---+
-                    //   |   n   |
-                    //   +---x---+ (x = old wall, n = new wall, F = current facet x,y)
-                    //   |   x F |
-                    //   +---x---+
-                    if (pt.y - 1 >= 0 // top exists
-                        && facetResult.facetMap.get(pt.x, pt.y - 1) === f.id // and is part of the same facet
-                        && (pt.x - 1 < 0 || facetResult.facetMap.get(pt.x - 1, pt.y - 1) !== f.id) // and
-                        && borderMask.get(pt.x, pt.y - 1)
-                        && !xWall.get(pt.x, pt.y - 1)) {
-                        // can place | wall at x,y-1
-                        if (debug) {
-                            console.log(`can place left | wall at x,y-1`);
-                        }
-                        const nextpt = new PathPoint(new point_1.Point(pt.x, pt.y - 1), OrientationEnum.Left);
-                        possibleNextPoints.push(nextpt);
-                    }
-                    // check downwards
-                    //   +---x---+
-                    //   |   x F |
-                    //   +---x---+ (x = old wall, n = new wall, F = current facet x,y)
-                    //   |   n   |
-                    //   +---n---+
-                    if (pt.y + 1 < facetResult.height
-                        && facetResult.facetMap.get(pt.x, pt.y + 1) === f.id
-                        && (pt.x - 1 < 0 || facetResult.facetMap.get(pt.x - 1, pt.y + 1) !== f.id)
-                        && borderMask.get(pt.x, pt.y + 1)
-                        && !xWall.get(pt.x, pt.y + 1)) {
-                        // can place | wall at x,y+1
-                        if (debug) {
-                            console.log("can place left | wall at x,y+1");
-                        }
-                        const nextpt = new PathPoint(new point_1.Point(pt.x, pt.y + 1), OrientationEnum.Left);
-                        possibleNextPoints.push(nextpt);
-                    }
-                    // check left upwards
-                    //   +---+---+
-                    //   |   |   |
-                    //   nnnnx---+ (x = old wall, n = new wall, F = current facet x,y)
-                    //   |   x F |
-                    //   +---x---+
-                    if (pt.y - 1 >= 0 && pt.x - 1 >= 0 // there is a left upwards
-                        && facetResult.facetMap.get(pt.x - 1, pt.y - 1) === f.id // and it belongs to the same facet
-                        && borderMask.get(pt.x - 1, pt.y - 1) // and is on the border
-                        && !yWall.get(pt.x - 1, pt.y - 1 + 1) // and the bottom wall isn't set yet
-                        && !yWall.get(pt.x, pt.y) // and the path didn't come from the top of the current one to prevent getting a T shaped path (issue: https://i.imgur.com/ggUWuXi.png)
-                    ) {
-                        // can place bottom _ wall at x-1,y-1
-                        if (debug) {
-                            console.log("can place bottom _ wall at x-1,y-1");
-                        }
-                        const nextpt = new PathPoint(new point_1.Point(pt.x - 1, pt.y - 1), OrientationEnum.Bottom);
-                        possibleNextPoints.push(nextpt);
-                    }
-                    // check left downwards
-                    //   +---x---+
-                    //   |   x F |
-                    //   nnnnx---+ (x = old wall, n = new wall, F = current facet x,y)
-                    //   |   |   |
-                    //   +---+---+
-                    if (pt.y + 1 < facetResult.height && pt.x - 1 >= 0 // there is a left downwards
-                        && facetResult.facetMap.get(pt.x - 1, pt.y + 1) === f.id // and belongs to the same facet
-                        && borderMask.get(pt.x - 1, pt.y + 1) // and is on the border
-                        && !yWall.get(pt.x - 1, pt.y + 1) // and the top wall isn't set yet
-                        && !yWall.get(pt.x, pt.y + 1) // and the path didn't come from the bottom of the current point to prevent T shape
-                    ) {
-                        // can place top _ wall at x-1,y+1
-                        if (debug) {
-                            console.log("can place top _ wall at x-1,y+1");
-                        }
-                        const nextpt = new PathPoint(new point_1.Point(pt.x - 1, pt.y + 1), OrientationEnum.Top);
-                        possibleNextPoints.push(nextpt);
-                    }
-                }
-                else if (pt.orientation === OrientationEnum.Top) {
-                    // check rotate to left
-                    if (((pt.x - 1 >= 0
-                        && facetResult.facetMap.get(pt.x - 1, pt.y) !== f.id)
-                        || pt.x - 1 < 0)
-                        && !xWall.get(pt.x, pt.y)) {
-                        // can place left | wall at x,y
-                        if (debug) {
-                            console.log("can place left | wall at x,y");
-                        }
-                        const nextpt = new PathPoint(new point_1.Point(pt.x, pt.y), OrientationEnum.Left);
-                        possibleNextPoints.push(nextpt);
-                    }
-                    // check rotate to right
-                    if (((pt.x + 1 < facetResult.width
-                        && facetResult.facetMap.get(pt.x + 1, pt.y) !== f.id)
-                        || pt.x + 1 >= facetResult.width)
-                        && !xWall.get(pt.x + 1, pt.y)) {
-                        // can place right | wall at x,y
-                        if (debug) {
-                            console.log("can place right | wall at x,y");
-                        }
-                        const nextpt = new PathPoint(new point_1.Point(pt.x, pt.y), OrientationEnum.Right);
-                        possibleNextPoints.push(nextpt);
-                    }
-                    // check leftwards
-                    if (pt.x - 1 >= 0
-                        && facetResult.facetMap.get(pt.x - 1, pt.y) === f.id
-                        && (pt.y - 1 < 0 || facetResult.facetMap.get(pt.x - 1, pt.y - 1) !== f.id)
-                        && borderMask.get(pt.x - 1, pt.y)
-                        && !yWall.get(pt.x - 1, pt.y)) {
-                        // can place top _ wall at x-1,y
-                        if (debug) {
-                            console.log(`can place top _ wall at x-1,y`);
-                        }
-                        const nextpt = new PathPoint(new point_1.Point(pt.x - 1, pt.y), OrientationEnum.Top);
-                        possibleNextPoints.push(nextpt);
-                    }
-                    // check rightwards
-                    if (pt.x + 1 < facetResult.width
-                        && facetResult.facetMap.get(pt.x + 1, pt.y) === f.id
-                        && (pt.y - 1 < 0 || facetResult.facetMap.get(pt.x + 1, pt.y - 1) !== f.id)
-                        && borderMask.get(pt.x + 1, pt.y)
-                        && !yWall.get(pt.x + 1, pt.y)) {
-                        // can place top _ wall at x+1,y
-                        if (debug) {
-                            console.log(`can place top _ wall at x+1,y`);
-                        }
-                        const nextpt = new PathPoint(new point_1.Point(pt.x + 1, pt.y), OrientationEnum.Top);
-                        possibleNextPoints.push(nextpt);
-                    }
-                    // check left upwards
-                    if (pt.y - 1 >= 0 && pt.x - 1 >= 0 // there is a left upwards
-                        && facetResult.facetMap.get(pt.x - 1, pt.y - 1) === f.id // and it belongs to the same facet
-                        && borderMask.get(pt.x - 1, pt.y - 1) // and it's part of the border
-                        && !xWall.get(pt.x - 1 + 1, pt.y - 1) // the right wall isn't set yet
-                        && !xWall.get(pt.x, pt.y) // and the left wall of the current point isn't set yet to prevent |- path
-                    ) {
-                        // can place right | wall at x-1,y-1
-                        if (debug) {
-                            console.log("can place right | wall at x-1,y-1");
-                        }
-                        const nextpt = new PathPoint(new point_1.Point(pt.x - 1, pt.y - 1), OrientationEnum.Right);
-                        possibleNextPoints.push(nextpt);
-                    }
-                    // check right upwards
-                    if (pt.y - 1 >= 0 && pt.x + 1 < facetResult.width // there is a right upwards
-                        && facetResult.facetMap.get(pt.x + 1, pt.y - 1) === f.id // and it belongs to the same facet
-                        && borderMask.get(pt.x + 1, pt.y - 1) // and it's on the border
-                        && !xWall.get(pt.x + 1, pt.y - 1) // and the left wall isn't set yet
-                        && !xWall.get(pt.x + 1, pt.y) // and the right wall of the current point isn't set yet to prevent -| path
-                    ) {
-                        // can place left |  wall at x+1,y-1
-                        if (debug) {
-                            console.log("can place left |  wall at x+1,y-1");
-                        }
-                        const nextpt = new PathPoint(new point_1.Point(pt.x + 1, pt.y - 1), OrientationEnum.Left);
-                        possibleNextPoints.push(nextpt);
-                    }
-                }
-                else if (pt.orientation === OrientationEnum.Right) {
-                    // check rotate to top
-                    if (((pt.y - 1 >= 0
-                        && facetResult.facetMap.get(pt.x, pt.y - 1) !== f.id)
-                        || pt.y - 1 < 0)
-                        && !yWall.get(pt.x, pt.y)) {
-                        // can place top _ wall at x,y
-                        if (debug) {
-                            console.log("can place top _ wall at x,y");
-                        }
-                        const nextpt = new PathPoint(new point_1.Point(pt.x, pt.y), OrientationEnum.Top);
-                        possibleNextPoints.push(nextpt);
-                    }
-                    // check rotate to bottom
-                    if (((pt.y + 1 < facetResult.height
-                        && facetResult.facetMap.get(pt.x, pt.y + 1) !== f.id)
-                        || pt.y + 1 >= facetResult.height)
-                        && !yWall.get(pt.x, pt.y + 1)) {
-                        // can place bottom  _ wall at x,y
-                        if (debug) {
-                            console.log("can place bottom _ wall at x,y");
-                        }
-                        const nextpt = new PathPoint(new point_1.Point(pt.x, pt.y), OrientationEnum.Bottom);
-                        possibleNextPoints.push(nextpt);
-                    }
-                    // check upwards
-                    if (pt.y - 1 >= 0
-                        && facetResult.facetMap.get(pt.x, pt.y - 1) === f.id
-                        && (pt.x + 1 >= facetResult.width || facetResult.facetMap.get(pt.x + 1, pt.y - 1) !== f.id)
-                        && borderMask.get(pt.x, pt.y - 1)
-                        && !xWall.get(pt.x + 1, pt.y - 1)) {
-                        // can place right | wall at x,y-1
-                        if (debug) {
-                            console.log(`can place right | wall at x,y-1`);
-                        }
-                        const nextpt = new PathPoint(new point_1.Point(pt.x, pt.y - 1), OrientationEnum.Right);
-                        possibleNextPoints.push(nextpt);
-                    }
-                    // check downwards
-                    if (pt.y + 1 < facetResult.height
-                        && facetResult.facetMap.get(pt.x, pt.y + 1) === f.id
-                        && (pt.x + 1 >= facetResult.width || facetResult.facetMap.get(pt.x + 1, pt.y + 1) !== f.id)
-                        && borderMask.get(pt.x, pt.y + 1)
-                        && !xWall.get(pt.x + 1, pt.y + 1)) {
-                        // can place right | wall at x,y+1
-                        if (debug) {
-                            console.log("can place right | wall at x,y+1");
-                        }
-                        const nextpt = new PathPoint(new point_1.Point(pt.x, pt.y + 1), OrientationEnum.Right);
-                        possibleNextPoints.push(nextpt);
-                    }
-                    // check right upwards
-                    if (pt.y - 1 >= 0 && pt.x + 1 < facetResult.width // there is a right upwards
-                        && facetResult.facetMap.get(pt.x + 1, pt.y - 1) === f.id // and belongs to the same facet
-                        && borderMask.get(pt.x + 1, pt.y - 1) // and is on the border
-                        && !yWall.get(pt.x + 1, pt.y - 1 + 1) // and the bottom wall isn't set yet
-                        && !yWall.get(pt.x, pt.y) // and the top wall of the current point isn't set to prevent a T shape
-                    ) {
-                        // can place bottom _ wall at x+1,y-1
-                        if (debug) {
-                            console.log("can place bottom _ wall at x+1,y-1");
-                        }
-                        const nextpt = new PathPoint(new point_1.Point(pt.x + 1, pt.y - 1), OrientationEnum.Bottom);
-                        possibleNextPoints.push(nextpt);
-                    }
-                    // check right downwards
-                    if (pt.y + 1 < facetResult.height && pt.x + 1 < facetResult.width // there is a right downwards
-                        && facetResult.facetMap.get(pt.x + 1, pt.y + 1) === f.id // and belongs to the same facet
-                        && borderMask.get(pt.x + 1, pt.y + 1) // and is on the border
-                        && !yWall.get(pt.x + 1, pt.y + 1) // and the top wall isn't visited yet
-                        && !yWall.get(pt.x, pt.y + 1) // and the bottom wall of the current point isn't set to prevent a T shape
-                    ) {
-                        // can place top _ wall at x+1,y+1
-                        if (debug) {
-                            console.log("can place top _ wall at x+1,y+1");
-                        }
-                        const nextpt = new PathPoint(new point_1.Point(pt.x + 1, pt.y + 1), OrientationEnum.Top);
-                        possibleNextPoints.push(nextpt);
-                    }
-                }
-                else if (pt.orientation === OrientationEnum.Bottom) {
-                    // check rotate to left
-                    if (((pt.x - 1 >= 0
-                        && facetResult.facetMap.get(pt.x - 1, pt.y) !== f.id)
-                        || pt.x - 1 < 0)
-                        && !xWall.get(pt.x, pt.y)) {
-                        // can place left | wall at x,y
-                        if (debug) {
-                            console.log("can place left | wall at x,y");
-                        }
-                        const nextpt = new PathPoint(new point_1.Point(pt.x, pt.y), OrientationEnum.Left);
-                        possibleNextPoints.push(nextpt);
-                    }
-                    // check rotate to right
-                    if (((pt.x + 1 < facetResult.width
-                        && facetResult.facetMap.get(pt.x + 1, pt.y) !== f.id)
-                        || pt.x + 1 >= facetResult.width)
-                        && !xWall.get(pt.x + 1, pt.y)) {
-                        // can place right | wall at x,y
-                        if (debug) {
-                            console.log("can place right | wall at x,y");
-                        }
-                        const nextpt = new PathPoint(new point_1.Point(pt.x, pt.y), OrientationEnum.Right);
-                        possibleNextPoints.push(nextpt);
-                    }
-                    // check leftwards
-                    if (pt.x - 1 >= 0
-                        && facetResult.facetMap.get(pt.x - 1, pt.y) === f.id
-                        && (pt.y + 1 >= facetResult.height || facetResult.facetMap.get(pt.x - 1, pt.y + 1) !== f.id)
-                        && borderMask.get(pt.x - 1, pt.y)
-                        && !yWall.get(pt.x - 1, pt.y + 1)) {
-                        // can place bottom _ wall at x-1,y
-                        if (debug) {
-                            console.log(`can place bottom _ wall at x-1,y`);
-                        }
-                        const nextpt = new PathPoint(new point_1.Point(pt.x - 1, pt.y), OrientationEnum.Bottom);
-                        possibleNextPoints.push(nextpt);
-                    }
-                    // check rightwards
-                    if (pt.x + 1 < facetResult.width
-                        && facetResult.facetMap.get(pt.x + 1, pt.y) === f.id
-                        && (pt.y + 1 >= facetResult.height || facetResult.facetMap.get(pt.x + 1, pt.y + 1) !== f.id)
-                        && borderMask.get(pt.x + 1, pt.y)
-                        && !yWall.get(pt.x + 1, pt.y + 1)) {
-                        // can place top _ wall at x+1,y
-                        if (debug) {
-                            console.log(`can place bottom _ wall at x+1,y`);
-                        }
-                        const nextpt = new PathPoint(new point_1.Point(pt.x + 1, pt.y), OrientationEnum.Bottom);
-                        possibleNextPoints.push(nextpt);
-                    }
-                    // check left downwards
-                    if (pt.y + 1 < facetResult.height && pt.x - 1 >= 0 // there is a left downwards
-                        && facetResult.facetMap.get(pt.x - 1, pt.y + 1) === f.id // and it's the same facet
-                        && borderMask.get(pt.x - 1, pt.y + 1) // and it's on the border
-                        && !xWall.get(pt.x - 1 + 1, pt.y + 1) // and the right wall isn't set yet
-                        && !xWall.get(pt.x, pt.y) // and the left wall of the current point isn't set yet to prevent |- path
-                    ) {
-                        // can place right | wall at x-1,y-1
-                        if (debug) {
-                            console.log("can place right | wall at x-1,y+1");
-                        }
-                        const nextpt = new PathPoint(new point_1.Point(pt.x - 1, pt.y + 1), OrientationEnum.Right);
-                        possibleNextPoints.push(nextpt);
-                    }
-                    // check right downwards
-                    if (pt.y + 1 < facetResult.height && pt.x + 1 < facetResult.width // there is a right downwards
-                        && facetResult.facetMap.get(pt.x + 1, pt.y + 1) === f.id // and it's the same facet
-                        && borderMask.get(pt.x + 1, pt.y + 1) // and it's on the border
-                        && !xWall.get(pt.x + 1, pt.y + 1) // and the left wall isn't set yet
-                        && !xWall.get(pt.x + 1, pt.y) // and the right wall of the current point isn't set yet to prevent -| path
-                    ) {
-                        // can place left |  wall at x+1,y+1
-                        if (debug) {
-                            console.log("can place left |  wall at x+1,y+1");
-                        }
-                        const nextpt = new PathPoint(new point_1.Point(pt.x + 1, pt.y + 1), OrientationEnum.Left);
-                        possibleNextPoints.push(nextpt);
-                    }
-                }
-                if (possibleNextPoints.length > 1) {
-                    // TODO it's now not necessary anymore to aggregate all possibilities, the first one is going to be the correct
-                    // selection to trace the entire border, so the if checks above can include a skip once ssible point is found again
-                    pt = possibleNextPoints[0];
-                    FacetBorderTracer.addPointToPath(path, pt, xWall, f, yWall);
-                }
-                else if (possibleNextPoints.length === 1) {
-                    pt = possibleNextPoints[0];
-                    FacetBorderTracer.addPointToPath(path, pt, xWall, f, yWall);
-                }
-                else {
-                    finished = true;
-                }
-            }
-            // clear up the walls set for the path so the array can be reused
-            for (const pathPoint of path) {
-                switch (pathPoint.orientation) {
-                    case OrientationEnum.Left:
-                        xWall.set(pathPoint.x, pathPoint.y, false);
-                        break;
-                    case OrientationEnum.Top:
-                        yWall.set(pathPoint.x, pathPoint.y, false);
-                        break;
-                    case OrientationEnum.Right:
-                        xWall.set(pathPoint.x + 1, pathPoint.y, false);
-                        break;
-                    case OrientationEnum.Bottom:
-                        yWall.set(pathPoint.x, pathPoint.y + 1, false);
-                        break;
-                }
-            }
-            return path;
-        }
-        /**
-         * Add a point to the border path and ensure the correct xWall/yWalls is set
-         */
-        static addPointToPath(path, pt, xWall, f, yWall) {
-            path.push(pt);
-            switch (pt.orientation) {
-                case OrientationEnum.Left:
-                    xWall.set(pt.x, pt.y, true);
-                    break;
-                case OrientationEnum.Top:
-                    yWall.set(pt.x, pt.y, true);
-                    break;
-                case OrientationEnum.Right:
-                    xWall.set(pt.x + 1, pt.y, true);
-                    break;
-                case OrientationEnum.Bottom:
-                    yWall.set(pt.x, pt.y + 1, true);
-                    break;
-            }
-        }
-    }
-    exports.FacetBorderTracer = FacetBorderTracer;
-    class FacetBorderSegmenter {
-        /**
-         *  Builds border segments that are shared between facets
-         *  While border paths are all nice and fancy, they are not linked to neighbour facets
-         *  So any change in the paths makes a not so nice gap between the facets, which makes smoothing them out impossible
-         */
-        static buildFacetBorderSegments(facetResult, nrOfTimesToHalvePoints = 2, onUpdate = null) {
-            return __awaiter(this, void 0, void 0, function* () {
-                // first chop up the border path in segments each time the neighbour at that point changes
-                // (and sometimes even when it doesn't on that side but does on the neighbour's side)
-                const segmentsPerFacet = FacetBorderSegmenter.prepareSegmentsPerFacet(facetResult);
-                // now reduce the segment complexity with Haar wavelet reduction to smooth them out and make them
-                // more curvy with data points instead of zig zag of a grid
-                FacetBorderSegmenter.reduceSegmentComplexity(facetResult, segmentsPerFacet, nrOfTimesToHalvePoints);
-                // now see which segments of facets with the prepared segments of the neighbour facets
-                // and point them to the same one
-                yield FacetBorderSegmenter.matchSegmentsWithNeighbours(facetResult, segmentsPerFacet, onUpdate);
-            });
-        }
-        /**
-         *  Chops up the border paths per facet into segments adjacent tothe same neighbour
-         */
-        static prepareSegmentsPerFacet(facetResult) {
-            const segmentsPerFacet = new Array(facetResult.facets.length);
-            for (const f of facetResult.facets) {
-                if (f != null) {
-                    const segments = [];
-                    if (f.borderPath.length > 1) {
-                        let currentPoints = [];
-                        currentPoints.push(f.borderPath[0]);
-                        for (let i = 1; i < f.borderPath.length; i++) {
-                            const prevBorderPoint = f.borderPath[i - 1];
-                            const curBorderPoint = f.borderPath[i];
-                            const oldNeighbour = prevBorderPoint.getNeighbour(facetResult);
-                            const curNeighbour = curBorderPoint.getNeighbour(facetResult);
-                            let isTransitionPoint = false;
-                            if (oldNeighbour !== curNeighbour) {
-                                isTransitionPoint = true;
-                            }
-                            else {
-                                // it's possible that due to inner facets inside the current facet that the
-                                // border is interrupted on that facet's side, but not on the neighbour's side
-                                if (oldNeighbour !== -1) {
-                                    // check for tight rotations to break path if diagonals contain a different neighbour,
-                                    // see https://i.imgur.com/o6Srqwj.png for visual path of the issue
-                                    if (prevBorderPoint.x === curBorderPoint.x &&
-                                        prevBorderPoint.y === curBorderPoint.y) {
-                                        // rotation turn
-                                        // check the diagonal neighbour to see if it remains the same
-                                        //   +---+---+
-                                        //   | dN|   |
-                                        //   +---xxxx> (x = wall, dN = diagNeighbour)
-                                        //   |   x f |
-                                        //   +---v---+
-                                        if ((prevBorderPoint.orientation === OrientationEnum.Top && curBorderPoint.orientation === OrientationEnum.Left) ||
-                                            (prevBorderPoint.orientation === OrientationEnum.Left && curBorderPoint.orientation === OrientationEnum.Top)) {
-                                            const diagNeighbour = facetResult.facetMap.get(curBorderPoint.x - 1, curBorderPoint.y - 1);
-                                            if (diagNeighbour !== oldNeighbour) {
-                                                isTransitionPoint = true;
-                                            }
-                                        }
-                                        else if ((prevBorderPoint.orientation === OrientationEnum.Top && curBorderPoint.orientation === OrientationEnum.Right) ||
-                                            (prevBorderPoint.orientation === OrientationEnum.Right && curBorderPoint.orientation === OrientationEnum.Top)) {
-                                            const diagNeighbour = facetResult.facetMap.get(curBorderPoint.x + 1, curBorderPoint.y - 1);
-                                            if (diagNeighbour !== oldNeighbour) {
-                                                isTransitionPoint = true;
-                                            }
-                                        }
-                                        else if ((prevBorderPoint.orientation === OrientationEnum.Bottom && curBorderPoint.orientation === OrientationEnum.Left) ||
-                                            (prevBorderPoint.orientation === OrientationEnum.Left && curBorderPoint.orientation === OrientationEnum.Bottom)) {
-                                            const diagNeighbour = facetResult.facetMap.get(curBorderPoint.x - 1, curBorderPoint.y + 1);
-                                            if (diagNeighbour !== oldNeighbour) {
-                                                isTransitionPoint = true;
-                                            }
-                                        }
-                                        else if ((prevBorderPoint.orientation === OrientationEnum.Bottom && curBorderPoint.orientation === OrientationEnum.Right) ||
-                                            (prevBorderPoint.orientation === OrientationEnum.Right && curBorderPoint.orientation === OrientationEnum.Bottom)) {
-                                            const diagNeighbour = facetResult.facetMap.get(curBorderPoint.x + 1, curBorderPoint.y + 1);
-                                            if (diagNeighbour !== oldNeighbour) {
-                                                isTransitionPoint = true;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            currentPoints.push(curBorderPoint);
-                            if (isTransitionPoint) {
-                                // aha! a transition point, create the current points as new segment
-                                // and start a new list
-                                if (currentPoints.length > 1) {
-                                    const segment = new PathSegment(currentPoints, oldNeighbour);
-                                    segments.push(segment);
-                                    currentPoints = [curBorderPoint];
-                                }
-                            }
-                        }
-                        // finally check if there is a remainder partial segment and either prepend
-                        // the points to the first segment if they have the same neighbour or construct a
-                        // new segment
-                        if (currentPoints.length > 1) {
-                            const oldNeighbour = f.borderPath[f.borderPath.length - 1].getNeighbour(facetResult);
-                            if (segments.length > 0 && segments[0].neighbour === oldNeighbour) {
-                                // the first segment and the remainder of the last one are the same part
-                                // add the current points to the first segment by prefixing it
-                                const mergedPoints = currentPoints.concat(segments[0].points);
-                                segments[0].points = mergedPoints;
-                            }
-                            else {
-                                // add the remainder as final segment
-                                const segment = new PathSegment(currentPoints, oldNeighbour);
-                                segments.push(segment);
-                                currentPoints = [];
-                            }
-                        }
-                    }
-                    segmentsPerFacet[f.id] = segments;
-                }
-            }
-            return segmentsPerFacet;
-        }
-        /**
-         * Reduces each segment border path points
-         */
-        static reduceSegmentComplexity(facetResult, segmentsPerFacet, nrOfTimesToHalvePoints) {
-            for (const f of facetResult.facets) {
-                if (f != null) {
-                    for (const segment of segmentsPerFacet[f.id]) {
-                        for (let i = 0; i < nrOfTimesToHalvePoints; i++) {
-                            segment.points = FacetBorderSegmenter.reduceSegmentHaarWavelet(segment.points, true, facetResult.width, facetResult.height);
-                        }
-                    }
-                }
-            }
-        }
-        /**
-         *  Remove the points by taking the average per pair and using that as a new point
-         *  in the reduced segment. The delta values that create the Haar wavelet are not tracked
-         *  because they are unneeded.
-         */
-        static reduceSegmentHaarWavelet(newpath, skipOutsideBorders, width, height) {
-            if (newpath.length <= 5) {
-                return newpath;
-            }
-            const reducedPath = [];
-            reducedPath.push(newpath[0]);
-            for (let i = 1; i < newpath.length - 2; i += 2) {
-                if (!skipOutsideBorders || (skipOutsideBorders && !FacetBorderSegmenter.isOutsideBorderPoint(newpath[i], width, height))) {
-                    const cx = (newpath[i].x + newpath[i + 1].x) / 2;
-                    const cy = (newpath[i].y + newpath[i + 1].y) / 2;
-                    reducedPath.push(new PathPoint(new point_1.Point(cx, cy), OrientationEnum.Left));
-                }
-                else {
-                    reducedPath.push(newpath[i]);
-                    reducedPath.push(newpath[i + 1]);
-                }
-            }
-            // close the loop
-            reducedPath.push(newpath[newpath.length - 1]);
-            return reducedPath;
-        }
-        static isOutsideBorderPoint(point, width, height) {
-            return point.x === 0 || point.y === 0 || point.x === width - 1 || point.y === height - 1;
-        }
-        static calculateArea(path) {
-            let total = 0;
-            for (let i = 0; i < path.length; i++) {
-                const addX = path[i].x;
-                const addY = path[i === path.length - 1 ? 0 : i + 1].y;
-                const subX = path[i === path.length - 1 ? 0 : i + 1].x;
-                const subY = path[i].y;
-                total += (addX * addY * 0.5);
-                total -= (subX * subY * 0.5);
-            }
-            return Math.abs(total);
-        }
-        /**
-         *  Matches all segments with each other between facets and their neighbour
-         *  A segment matches when the start and end match or the start matches with the end and vice versa
-         *  (then the segment will need to be traversed in reverse order)
-         */
-        static matchSegmentsWithNeighbours(facetResult, segmentsPerFacet, onUpdate = null) {
-            return __awaiter(this, void 0, void 0, function* () {
-                // max distance of the start/end points of the segment that it can be before the segments don't match up
-                const MAX_DISTANCE = 4;
-                // reserve room
-                for (const f of facetResult.facets) {
-                    if (f != null) {
-                        f.borderSegments = new Array(segmentsPerFacet[f.id].length);
-                    }
-                }
-                let count = 0;
-                // and now the fun begins to match segments from 1 facet to its neighbours and vice versa
-                for (const f of facetResult.facets) {
-                    if (f != null) {
-                        const debug = false;
-                        for (let s = 0; s < segmentsPerFacet[f.id].length; s++) {
-                            const segment = segmentsPerFacet[f.id][s];
-                            if (segment != null && f.borderSegments[s] == null) {
-                                f.borderSegments[s] = new FacetBoundarySegment(segment, segment.neighbour, false);
-                                if (debug) {
-                                    console.log("Setting facet " + f.id + " segment " + s + " to " + f.borderSegments[s]);
-                                }
-                                if (segment.neighbour !== -1) {
-                                    const neighbourFacet = facetResult.facets[segment.neighbour];
-                                    // see if there is a match to be found
-                                    let matchFound = false;
-                                    if (neighbourFacet != null) {
-                                        const neighbourSegments = segmentsPerFacet[segment.neighbour];
-                                        for (let ns = 0; ns < neighbourSegments.length; ns++) {
-                                            const neighbourSegment = neighbourSegments[ns];
-                                            // only try to match against the segments that aren't processed yet
-                                            // and which are adjacent to the boundary of the current facet
-                                            if (neighbourSegment != null && neighbourSegment.neighbour === f.id) {
-                                                const segStartPoint = segment.points[0];
-                                                const segEndPoint = segment.points[segment.points.length - 1];
-                                                const nSegStartPoint = neighbourSegment.points[0];
-                                                const nSegEndPoint = neighbourSegment.points[neighbourSegment.points.length - 1];
-                                                let matchesStraight = (segStartPoint.distanceTo(nSegStartPoint) <= MAX_DISTANCE &&
-                                                    segEndPoint.distanceTo(nSegEndPoint) <= MAX_DISTANCE);
-                                                let matchesReverse = (segStartPoint.distanceTo(nSegEndPoint) <= MAX_DISTANCE &&
-                                                    segEndPoint.distanceTo(nSegStartPoint) <= MAX_DISTANCE);
-                                                if (matchesStraight && matchesReverse) {
-                                                    // dang it , both match, it must be a tiny segment, but when placed wrongly it'll overlap in the path creating an hourglass 
-                                                    //  e.g. https://i.imgur.com/XZQhxRV.png
-                                                    // determine which is the closest
-                                                    if (segStartPoint.distanceTo(nSegStartPoint) + segEndPoint.distanceTo(nSegEndPoint) <
-                                                        segStartPoint.distanceTo(nSegEndPoint) + segEndPoint.distanceTo(nSegStartPoint)) {
-                                                        matchesStraight = true;
-                                                        matchesReverse = false;
-                                                    }
-                                                    else {
-                                                        matchesStraight = false;
-                                                        matchesReverse = true;
-                                                    }
-                                                }
-                                                if (matchesStraight) {
-                                                    // start & end points match
-                                                    if (debug) {
-                                                        console.log("Match found for facet " + f.id + " to neighbour " + neighbourFacet.id);
-                                                    }
-                                                    neighbourFacet.borderSegments[ns] = new FacetBoundarySegment(segment, f.id, false);
-                                                    if (debug) {
-                                                        console.log("Setting facet " + neighbourFacet.id + " segment " + ns + " to " + neighbourFacet.borderSegments[ns]);
-                                                    }
-                                                    segmentsPerFacet[neighbourFacet.id][ns] = null;
-                                                    matchFound = true;
-                                                    break;
-                                                }
-                                                else if (matchesReverse) {
-                                                    // start & end points match  but in reverse order
-                                                    if (debug) {
-                                                        console.log("Reverse match found for facet " + f.id + " to neighbour " + neighbourFacet.id);
-                                                    }
-                                                    neighbourFacet.borderSegments[ns] = new FacetBoundarySegment(segment, f.id, true);
-                                                    if (debug) {
-                                                        console.log("Setting facet " + neighbourFacet.id + " segment " + ns + " to " + neighbourFacet.borderSegments[ns]);
-                                                    }
-                                                    segmentsPerFacet[neighbourFacet.id][ns] = null;
-                                                    matchFound = true;
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                    }
-                                    if (!matchFound && debug) {
-                                        // it's possible that the border is not shared with its neighbour
-                                        // this can happen when the segment fully falls inside the other facet
-                                        // though the above checks in the preparation of the segments should probably
-                                        // cover all cases
-                                        console.error("No match found for segment of " + f.id + ": " +
-                                            ("siding " + segment.neighbour + " " + segment.points[0] + " -> " + segment.points[segment.points.length - 1]));
-                                    }
-                                }
-                            }
-                            // clear the current segment so it can't be processed again when processing the neighbour facet
-                            segmentsPerFacet[f.id][s] = null;
-                        }
-                        if (count % 100 === 0) {
-                            yield common_2.delay(0);
-                            if (onUpdate != null) {
-                                onUpdate(f.id / facetResult.facets.length);
-                            }
-                        }
-                    }
-                    count++;
-                }
-                if (onUpdate != null) {
-                    onUpdate(1);
-                }
-            });
-        }
-    }
-    exports.FacetBorderSegmenter = FacetBorderSegmenter;
     class FacetLabelPlacer {
         /**
          *  Determines where to place the labels for each facet. This is done by calculating where
@@ -2404,7 +2422,7 @@ define("facetmanagement", ["require", "exports", "common", "lib/fill", "lib/poly
                         // regardless if they are inner or not. These are seen as areas where the label
                         // cannot be placed
                         if (f.neighbourFacetsIsDirty) {
-                            FacetCreator.buildFacetNeighbour(f, facetResult);
+                            facetCreator_2.FacetCreator.buildFacetNeighbour(f, facetResult);
                         }
                         for (const neighbourIdx of f.neighbourFacets) {
                             const neighbourPath = facetResult.facets[neighbourIdx].getFullPathFromBorderSegments(true);
@@ -2414,7 +2432,7 @@ define("facetmanagement", ["require", "exports", "common", "lib/fill", "lib/poly
                             }
                         }
                         const result = polylabel_1.polylabel(polyRings);
-                        f.labelBounds = new boundingbox_1.BoundingBox();
+                        f.labelBounds = new boundingbox_2.BoundingBox();
                         // determine inner square within the circle
                         const innerPadding = 2 * Math.sqrt(2 * result.distance);
                         f.labelBounds.minX = result.pt.x - innerPadding;
@@ -2422,7 +2440,7 @@ define("facetmanagement", ["require", "exports", "common", "lib/fill", "lib/poly
                         f.labelBounds.minY = result.pt.y - innerPadding;
                         f.labelBounds.maxY = result.pt.y + innerPadding;
                         if (count % 100 === 0) {
-                            yield common_2.delay(0);
+                            yield common_6.delay(0);
                             if (onUpdate != null) {
                                 onUpdate(f.id / facetResult.facets.length);
                             }
@@ -2468,7 +2486,7 @@ define("facetmanagement", ["require", "exports", "common", "lib/fill", "lib/poly
 /**
  * Module that manages the GUI when processing
  */
-define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "common", "facetmanagement", "gui", "structs/point"], function (require, exports, colorreductionmanagement_1, common_3, facetmanagement_1, gui_1, point_2) {
+define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "common", "FacetBorderSegmenter", "facetBorderTracer", "facetCreator", "facetLabelPlacer", "FacetReducer", "gui", "structs/point"], function (require, exports, colorreductionmanagement_1, common_7, facetBorderSegmenter_1, facetBorderTracer_1, facetCreator_3, facetLabelPlacer_1, facetReducer_1, gui_1, point_5) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     class ProcessResult {
@@ -2563,7 +2581,7 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
             return __awaiter(this, void 0, void 0, function* () {
                 gui_1.time("Facet building");
                 $(".status.facetBuilding").addClass("active");
-                const facetResult = yield facetmanagement_1.FacetCreator.getFacets(imgData.width, imgData.height, colormapResult.imgColorIndices, (progress) => {
+                const facetResult = yield facetCreator_3.FacetCreator.getFacets(imgData.width, imgData.height, colormapResult.imgColorIndices, (progress) => {
                     if (cancellationToken.isCancelled) {
                         throw new Error("Cancelled");
                     }
@@ -2587,7 +2605,7 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                 const reductionImgData = ctxReduction.getImageData(0, 0, cReduction.width, cReduction.height);
                 tabsOutput.select("reduction-pane");
                 $(".status.facetReduction").addClass("active");
-                yield facetmanagement_1.FacetReducer.reduceFacets(settings.removeFacetsSmallerThanNrOfPoints, settings.removeFacetsFromLargeToSmall, colormapResult.colorsByIndex, facetResult, colormapResult.imgColorIndices, (progress) => {
+                yield facetReducer_1.FacetReducer.reduceFacets(settings.removeFacetsSmallerThanNrOfPoints, settings.removeFacetsFromLargeToSmall, colormapResult.colorsByIndex, facetResult, colormapResult.imgColorIndices, (progress) => {
                     if (cancellationToken.isCancelled) {
                         throw new Error("Cancelled");
                     }
@@ -2620,7 +2638,7 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                 cBorderPath.height = facetResult.height;
                 const ctxBorderPath = cBorderPath.getContext("2d");
                 $(".status.facetBorderPath").addClass("active");
-                yield facetmanagement_1.FacetBorderTracer.buildFacetBorderPaths(facetResult, (progress) => {
+                yield facetBorderTracer_1.FacetBorderTracer.buildFacetBorderPaths(facetResult, (progress) => {
                     if (cancellationToken.isCancelled) {
                         throw new Error("Cancelled");
                     }
@@ -2653,7 +2671,7 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                 const ctxBorderSegment = cBorderSegment.getContext("2d");
                 tabsOutput.select("bordersegmentation-pane");
                 $(".status.facetBorderSegmentation").addClass("active");
-                yield facetmanagement_1.FacetBorderSegmenter.buildFacetBorderSegments(facetResult, settings.nrOfTimesToHalveBorderSegments, (progress) => {
+                yield facetBorderSegmenter_1.FacetBorderSegmenter.buildFacetBorderSegments(facetResult, settings.nrOfTimesToHalveBorderSegments, (progress) => {
                     if (cancellationToken.isCancelled) {
                         throw new Error("Cancelled");
                     }
@@ -2691,7 +2709,7 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                 ctxLabelPlacement.drawImage(cBorderSegment, 0, 0);
                 tabsOutput.select("labelplacement-pane");
                 $(".status.facetLabelPlacement").addClass("active");
-                yield facetmanagement_1.FacetLabelPlacer.buildFacetLabelBounds(facetResult, (progress) => {
+                yield facetLabelPlacer_1.FacetLabelPlacer.buildFacetLabelBounds(facetResult, (progress) => {
                     if (cancellationToken.isCancelled) {
                         throw new Error("Cancelled");
                     }
@@ -2733,7 +2751,7 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                         }
                         else {
                             for (let i = 0; i < f.borderPath.length; i++) {
-                                newpath.push(new point_2.Point(f.borderPath[i].getWallX() + 0.5, f.borderPath[i].getWallY() + 0.5));
+                                newpath.push(new point_5.Point(f.borderPath[i].getWallX() + 0.5, f.borderPath[i].getWallY() + 0.5));
                             }
                         }
                         if (newpath[0].x !== newpath[newpath.length - 1].x || newpath[0].y !== newpath[newpath.length - 1].y) {
@@ -2748,7 +2766,7 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                             const midpointX = (newpath[i].x + newpath[i - 1].x) / 2;
                             const midpointY = (newpath[i].y + newpath[i - 1].y) / 2;
                             data += "Q " + (midpointX * sizeMultiplier) + " " + (midpointY * sizeMultiplier) + " " + (newpath[i].x * sizeMultiplier) + " " + (newpath[i].y * sizeMultiplier) + " ";
-                            //data += "L " + (newpath[i].x * sizeMultiplier) + " " + (newpath[i].y * sizeMultiplier) + " ";
+                            // data += "L " + (newpath[i].x * sizeMultiplier) + " " + (newpath[i].y * sizeMultiplier) + " ";
                         }
                         data += "Z";
                         svgPath.setAttribute("data-facetId", f.id + "");
@@ -2783,9 +2801,9 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                                   //data += "Q " + (midpointX * sizeMultiplier) + " " + (midpointY * sizeMultiplier) + " " + (newpath[i].x * sizeMultiplier) + " " + (newpath[i].y * sizeMultiplier) + " ";
                                   segData += "L " + (segPoints[i].x * sizeMultiplier) + " " + (segPoints[i].y * sizeMultiplier) + " ";
                               }
-          
+        
                               console.log("Facet " + f.id + ", segment " + segPoints[0].x + "," + segPoints[0].y + " -> " + segPoints[segPoints.length-1].x + "," +  segPoints[segPoints.length-1].y);
-          
+        
                               svgSegPath.setAttribute("data-segmentFacet", f.id + "");
                               // Set path's data
                               svgSegPath.setAttribute("d", segData);
@@ -2819,7 +2837,7 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                             svg.appendChild(g);
                         }
                         if (count % 100 === 0) {
-                            yield common_3.delay(0);
+                            yield common_7.delay(0);
                             if (onUpdate != null) {
                                 onUpdate(f.id / facetResult.facets.length);
                             }
@@ -2839,11 +2857,11 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
 /**
  * Module that provides function the GUI uses and updates the DOM accordingly
  */
-define("gui", ["require", "exports", "common", "guiprocessmanager", "settings"], function (require, exports, common_4, guiprocessmanager_1, settings_2) {
+define("gui", ["require", "exports", "common", "guiprocessmanager", "settings"], function (require, exports, common_8, guiprocessmanager_1, settings_2) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     let processResult = null;
-    let cancellationToken = new common_4.CancellationToken();
+    let cancellationToken = new common_8.CancellationToken();
     const timers = {};
     function time(name) {
         console.time(name);
@@ -2924,7 +2942,7 @@ define("gui", ["require", "exports", "common", "guiprocessmanager", "settings"],
                 const settings = parseSettings();
                 // cancel old process & create new
                 cancellationToken.isCancelled = true;
-                cancellationToken = new common_4.CancellationToken();
+                cancellationToken = new common_8.CancellationToken();
                 processResult = yield guiprocessmanager_1.GUIProcessManager.process(settings, cancellationToken);
                 yield updateOutput();
                 const tabsOutput = M.Tabs.getInstance(document.getElementById("tabsOutput"));

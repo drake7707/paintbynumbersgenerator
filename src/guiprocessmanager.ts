@@ -4,7 +4,12 @@
 
 import { ColorMapResult, ColorReducer } from "./colorreductionmanagement";
 import { CancellationToken, delay, IMap, RGB } from "./common";
-import { FacetBorderSegmenter, FacetBorderTracer, FacetCreator, FacetLabelPlacer, FacetReducer, FacetResult } from "./facetmanagement";
+import { FacetBorderSegmenter } from "./facetBorderSegmenter";
+import { FacetBorderTracer } from "./facetBorderTracer";
+import { FacetCreator } from "./facetCreator";
+import { FacetLabelPlacer } from "./facetLabelPlacer";
+import { FacetResult } from "./facetmanagement";
+import { FacetReducer } from "./facetReducer";
 import { time, timeEnd } from "./gui";
 import { Settings } from "./settings";
 import { Point } from "./structs/point";
@@ -85,7 +90,7 @@ export class GUIProcessManager {
     }
 
     private static async processKmeansClustering(imgData: ImageData, tabsOutput: M.Tabs, ctx: CanvasRenderingContext2D,
-        settings: Settings, cancellationToken: CancellationToken) {
+                                                 settings: Settings, cancellationToken: CancellationToken) {
         time("K-means clustering");
 
         const cKmeans = document.getElementById("cKMeans") as HTMLCanvasElement;
@@ -305,7 +310,7 @@ export class GUIProcessManager {
                     const midpointX = (newpath[i].x + newpath[i - 1].x) / 2;
                     const midpointY = (newpath[i].y + newpath[i - 1].y) / 2;
                     data += "Q " + (midpointX * sizeMultiplier) + " " + (midpointY * sizeMultiplier) + " " + (newpath[i].x * sizeMultiplier) + " " + (newpath[i].y * sizeMultiplier) + " ";
-                    //data += "L " + (newpath[i].x * sizeMultiplier) + " " + (newpath[i].y * sizeMultiplier) + " ";
+                    // data += "L " + (newpath[i].x * sizeMultiplier) + " " + (newpath[i].y * sizeMultiplier) + " ";
                 }
                 data += "Z";
 
@@ -343,9 +348,9 @@ export class GUIProcessManager {
                           //data += "Q " + (midpointX * sizeMultiplier) + " " + (midpointY * sizeMultiplier) + " " + (newpath[i].x * sizeMultiplier) + " " + (newpath[i].y * sizeMultiplier) + " ";
                           segData += "L " + (segPoints[i].x * sizeMultiplier) + " " + (segPoints[i].y * sizeMultiplier) + " ";
                       }
-  
+
                       console.log("Facet " + f.id + ", segment " + segPoints[0].x + "," + segPoints[0].y + " -> " + segPoints[segPoints.length-1].x + "," +  segPoints[segPoints.length-1].y);
-  
+
                       svgSegPath.setAttribute("data-segmentFacet", f.id + "");
                       // Set path's data
                       svgSegPath.setAttribute("d", segData);

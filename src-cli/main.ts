@@ -5,7 +5,12 @@ import * as path from "path";
 import * as process from "process";
 import { ColorReducer } from "../src/colorreductionmanagement";
 import { RGB } from "../src/common";
-import { FacetBorderSegmenter, FacetBorderTracer, FacetCreator, FacetLabelPlacer, FacetReducer, FacetResult } from "../src/facetmanagement";
+import { FacetBorderSegmenter } from "../src/facetBorderSegmenter";
+import { FacetBorderTracer } from "../src/facetBorderTracer";
+import { FacetCreator } from "../src/facetCreator";
+import { FacetLabelPlacer } from "../src/facetLabelPlacer";
+import { FacetResult } from "../src/facetmanagement";
+import { FacetReducer } from "../src/facetReducer";
 import { Settings } from "../src/settings";
 import { Point } from "../src/structs/point";
 
@@ -26,15 +31,15 @@ class CLISettings extends Settings {
 
 async function main() {
     const args = minimist(process.argv.slice(2));
-    const imagePath = args["i"];
-    const svgPath = args["o"];
+    const imagePath = args.i;
+    const svgPath = args.o;
 
     if (typeof imagePath === "undefined" || typeof svgPath === "undefined") {
         console.log("Usage: exe -i <input_image> -o <output_svg> [-c <settings_json>]");
         process.exit(1);
     }
 
-    let configPath = args["c"];
+    let configPath = args.c;
     if (typeof configPath === "undefined") {
         configPath = path.join(process.cwd(), "settings.json");
     } else {
@@ -119,7 +124,6 @@ async function main() {
         // progress
     });
 
-
     for (const profile of settings.outputProfiles) {
         console.log("Generating output for " + profile.name);
 
@@ -128,7 +132,6 @@ async function main() {
 
         fs.writeFileSync(svgProfilePath, svgString);
     }
-
 
     console.log("Generating palette info");
     const palettePath = path.join(path.dirname(svgPath), path.basename(svgPath).substr(0, path.basename(svgPath).length - path.extname(svgPath).length) + ".json");
@@ -153,11 +156,11 @@ async function main() {
 
     const paletteInfo = JSON.stringify(colormapResult.colorsByIndex.map((color, index) => {
         return {
-            index: index,
-            color: color,
+            areaPercentage: colorFrequency[index] / totalFrequency,
+            color,
             colorAlias: colorAliasesByColor[color.join(",")],
             frequency: colorFrequency[index],
-            areaPercentage: colorFrequency[index] / totalFrequency
+            index,
         };
     }), null, 2);
 
