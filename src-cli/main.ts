@@ -13,6 +13,7 @@ import { FacetResult } from "../src/facetmanagement";
 import { FacetReducer } from "../src/facetReducer";
 import { Settings } from "../src/settings";
 import { Point } from "../src/structs/point";
+const svg2img = require("svg2img");
 
 class CLISettingsOutputProfile {
     public name: string = "";
@@ -20,13 +21,18 @@ class CLISettingsOutputProfile {
     public svgFillFacets: boolean = true;
     public svgShowBorders: boolean = true;
     public svgSizeMultiplier: number = 3;
+
+    public svgFontSize: number = 60;
+    public svgFontColor: string = "black";
+
+    public filetype: "svg" | "png" | "jpg" = "svg";
+    public filetypeQuality: number = 95;
 }
 
 class CLISettings extends Settings {
 
     public outputProfiles: CLISettingsOutputProfile[] = [];
-    public svgFontSize: number = 60;
-    public svgFontColor: string = "black";
+
 }
 
 async function main() {
@@ -112,7 +118,7 @@ async function main() {
         });
     } else {
         for (let run = 0; run < settings.narrowPixelStripCleanupRuns; run++) {
-            console.log("Removing narrow pixels run #" + (run+1));
+            console.log("Removing narrow pixels run #" + (run + 1));
             // clean up narrow pixel strips
             await ColorReducer.processNarrowPixelStripCleanup(colormapResult);
 
@@ -148,10 +154,35 @@ async function main() {
     for (const profile of settings.outputProfiles) {
         console.log("Generating output for " + profile.name);
 
-        const svgProfilePath = path.join(path.dirname(svgPath), path.basename(svgPath).substr(0, path.basename(svgPath).length - path.extname(svgPath).length) + "-" + profile.name + path.extname(svgPath));
-        const svgString = await createSVG(facetResult, colormapResult.colorsByIndex, profile.svgSizeMultiplier, profile.svgFillFacets, profile.svgShowBorders, profile.svgShowLabels, settings.svgFontSize, settings.svgFontColor);
+        const svgProfilePath = path.join(path.dirname(svgPath), path.basename(svgPath).substr(0, path.basename(svgPath).length - path.extname(svgPath).length) + "-" + profile.name) + "." + profile.filetype;
+        const svgString = await createSVG(facetResult, colormapResult.colorsByIndex, profile.svgSizeMultiplier, profile.svgFillFacets, profile.svgShowBorders, profile.svgShowLabels, profile.svgFontSize, profile.svgFontColor);
 
-        fs.writeFileSync(svgProfilePath, svgString);
+        if (profile.filetype === "svg") {
+            fs.writeFileSync(svgProfilePath, svgString);
+        } else if (profile.filetype === "png") {
+
+            const imageBuffer = await new Promise<Buffer>((then, reject) => {
+                svg2img(svgString, function (error: Error, buffer: Buffer) {
+                    if (error) {
+                        reject(error);
+                    } else {
+                        then(buffer);
+                    }
+                });
+            });
+            fs.writeFileSync(svgProfilePath, imageBuffer);
+        } else if (profile.filetype === "jpg") {
+            const imageBuffer = await new Promise<Buffer>((then, reject) => {
+                svg2img(svgString, { format: "jpg", quality: profile.filetypeQuality }, function (error: Error, buffer: Buffer) {
+                    if (error) {
+                        reject(error);
+                    } else {
+                        then(buffer);
+                    }
+                });
+            });
+            fs.writeFileSync(svgProfilePath, imageBuffer);
+        }
     }
 
     console.log("Generating palette info");
@@ -250,7 +281,7 @@ async function createSVG(facetResult: FacetResult, colorsByIndex: RGB[], sizeMul
             svgPathString += `style="`;
             svgPathString += `fill: ${svgFill};`;
             if (svgStroke !== "") {
-                svgPathString += `stroke: ${svgStroke}; stroke-width=1px`;
+                svgPathString += `stroke: ${svgStroke}; stroke-width:1px`;
             }
             svgPathString += `"`;
 

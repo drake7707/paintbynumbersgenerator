@@ -2,46 +2,82 @@
     "kMeansNrOfClusters": 16,
     "kMeansMinDeltaDifference": 1,
     "kMeansClusteringColorSpace": 0,
-
-    "kMeansColorRestrictions": [
-       
-    ],
+    "kMeansColorRestrictions": [],
     "colorAliases": {
-        "A1": [0,0,0],
-        "A2": [ 255, 0, 0 ],
-        "A3": [ 0, 255, 0 ],
-        "A4": [ 0, 0, 255 ],
-        "B1":  [ 64, 64, 64 ],
-        "B2": [ 128, 128, 128 ],
-        "B3":  [ 192, 192, 192 ]
+        "A1": [
+            0,
+            0,
+            0
+        ],
+        "A2": [
+            255,
+            0,
+            0
+        ],
+        "A3": [
+            0,
+            255,
+            0
+        ],
+        "A4": [
+            0,
+            0,
+            255
+        ],
+        "B1": [
+            64,
+            64,
+            64
+        ],
+        "B2": [
+            128,
+            128,
+            128
+        ],
+        "B3": [
+            192,
+            192,
+            192
+        ]
     },
     "removeFacetsSmallerThanNrOfPoints": 20,
     "removeFacetsFromLargeToSmall": true,
     "nrOfTimesToHalveBorderSegments": 2,
-    
     "narrowPixelStripCleanupRuns": 3,
-    
     "resizeImageIfTooLarge": true,
     "resizeImageWidth": 1024,
     "resizeImageHeight": 1024,
-
     "outputProfiles": [
         {
             "name": "full",
             "svgShowLabels": true,
             "svgFillFacets": true,
             "svgShowBorders": true,
-            "svgSizeMultiplier": 3
+            "svgSizeMultiplier": 3,
+            "svgFontSize": 50,
+            "svgFontColor": "#333",
+            "filetype": "png"
         },
         {
             "name": "bordersLabels",
             "svgShowLabels": true,
             "svgFillFacets": false,
             "svgShowBorders": true,
-            "svgSizeMultiplier": 3
+            "svgSizeMultiplier": 3,
+            "svgFontSize": 50,
+            "svgFontColor": "#333",
+            "filetype": "svg"
+        },
+        {
+            "name": "jpgtest",
+            "svgShowLabels": false,
+            "svgFillFacets": true,
+            "svgShowBorders": false,
+            "svgSizeMultiplier": 3,
+            "svgFontSize": 50,
+            "svgFontColor": "#333",
+            "filetype": "jpg",
+            "filetypeQuality": 80
         }
-    ],
-    
-    "svgFontSize": 50,
-    "svgFontColor": "#666"
+    ]
 }
