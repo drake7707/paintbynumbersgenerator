@@ -154,6 +154,10 @@ async function main() {
     for (const profile of settings.outputProfiles) {
         console.log("Generating output for " + profile.name);
 
+        if (typeof profile.filetype === "undefined") {
+            profile.filetype = "svg";
+        }
+
         const svgProfilePath = path.join(path.dirname(svgPath), path.basename(svgPath).substr(0, path.basename(svgPath).length - path.extname(svgPath).length) + "-" + profile.name) + "." + profile.filetype;
         const svgString = await createSVG(facetResult, colormapResult.colorsByIndex, profile.svgSizeMultiplier, profile.svgFillFacets, profile.svgShowBorders, profile.svgShowLabels, profile.svgFontSize, profile.svgFontColor);
 
