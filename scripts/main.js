@@ -442,6 +442,7 @@ define("colorreductionmanagement", ["require", "exports", "common", "lib/cluster
                     // determine the weight (#pointsOfColor / #totalpoints) of each color
                     const weight = pointsByColor[color].length / (imgData.width * imgData.height);
                     const vec = new clustering_1.Vector(data, weight);
+                    vec.tag = rgb;
                     vectors[vIdx++] = vec;
                 }
                 const random = new random_1.Random(settings.randomSeed);
@@ -493,6 +494,8 @@ define("colorreductionmanagement", ["require", "exports", "common", "lib/cluster
                     else {
                         rgb = centroid.values;
                     }
+                    // remove decimals
+                    rgb = rgb.map(v => Math.floor(v));
                     if (restrictToSpecifiedColors) {
                         if (settings.kMeansColorRestrictions.length > 0) {
                             // there are color restrictions, for each centroid find the color from the color restrictions that's the closest
@@ -527,8 +530,9 @@ define("colorreductionmanagement", ["require", "exports", "common", "lib/cluster
                             }
                         }
                     }
+                    let pointRGB = v.tag;
                     // replace all pixels of the old color by the new centroid color
-                    const pointColor = `${v.values[0]},${v.values[1]},${v.values[2]}`;
+                    const pointColor = `${Math.floor(pointRGB[0])},${Math.floor(pointRGB[1])},${Math.floor(pointRGB[2])}`;
                     for (const pt of pointsByColor[pointColor]) {
                         const ptx = pt % imgData.width;
                         const pty = Math.floor(pt / imgData.width);

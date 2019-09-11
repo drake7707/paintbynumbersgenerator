@@ -2,6 +2,8 @@ import { Random } from "../random";
 
 export class Vector {
 
+    public tag:any;
+    
     constructor(public values: number[], public weight: number = 1) { }
 
     public distanceTo(p: Vector): number {
