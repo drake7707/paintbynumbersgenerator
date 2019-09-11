@@ -61,6 +61,10 @@ export class FacetCreator {
         facet.color = facetColorIndex;
         facet.bbox = new BoundingBox();
         facet.borderPoints = [];
+        
+        facet.neighbourFacetsIsDirty = true; // not built neighbours yet
+        facet.neighbourFacets = null;
+
         fill(x, y, facetResult.width, facetResult.height, (ptx, pty) => visited.get(ptx, pty) || imgColorIndices.get(ptx, pty) !== facetColorIndex, (ptx, pty) => {
             visited.set(ptx, pty, true);
             facetResult.facetMap.set(ptx, pty, facetIndex);

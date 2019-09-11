@@ -19,6 +19,8 @@ export class Settings {
 
     public removeFacetsSmallerThanNrOfPoints: number = 20;
     public removeFacetsFromLargeToSmall: boolean = true;
+    public maximumNumberOfFacets: number = Number.MAX_VALUE;
+
     public nrOfTimesToHalveBorderSegments: number = 2;
 
     public resizeImageIfTooLarge: boolean = true;

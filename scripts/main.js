@@ -27,6 +27,25 @@ define("common", ["require", "exports"], function (require, exports) {
     }
     exports.CancellationToken = CancellationToken;
 });
+define("random", ["require", "exports"], function (require, exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    class Random {
+        constructor(seed) {
+            if (typeof seed === "undefined") {
+                this.seed = new Date().getTime();
+            }
+            else {
+                this.seed = seed;
+            }
+        }
+        next() {
+            const x = Math.sin(this.seed++) * 10000;
+            return x - Math.floor(x);
+        }
+    }
+    exports.Random = Random;
+});
 define("lib/clustering", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -69,9 +88,10 @@ define("lib/clustering", ["require", "exports"], function (require, exports) {
     }
     exports.Vector = Vector;
     class KMeans {
-        constructor(points, k, centroids = null) {
+        constructor(points, k, random, centroids = null) {
             this.points = points;
             this.k = k;
+            this.random = random;
             this.currentIteration = 0;
             this.pointsPerCategory = [];
             this.centroids = [];
@@ -88,7 +108,7 @@ define("lib/clustering", ["require", "exports"], function (require, exports) {
         }
         initCentroids() {
             for (let i = 0; i < this.k; i++) {
-                this.centroids.push(this.points[Math.floor(this.points.length * Math.random())]);
+                this.centroids.push(this.points[Math.floor(this.points.length * this.random.next())]);
                 this.pointsPerCategory.push([]);
             }
         }
@@ -265,10 +285,12 @@ define("settings", ["require", "exports"], function (require, exports) {
             this.narrowPixelStripCleanupRuns = 3; // 3 seems like a good compromise between removing enough narrow pixel strips to convergence. This fixes e.g. https://i.imgur.com/dz4ANz1.png
             this.removeFacetsSmallerThanNrOfPoints = 20;
             this.removeFacetsFromLargeToSmall = true;
+            this.maximumNumberOfFacets = Number.MAX_VALUE;
             this.nrOfTimesToHalveBorderSegments = 2;
             this.resizeImageIfTooLarge = true;
             this.resizeImageWidth = 1024;
             this.resizeImageHeight = 1024;
+            this.randomSeed = new Date().getTime();
         }
     }
     exports.Settings = Settings;
@@ -326,7 +348,7 @@ define("structs/typedarrays", ["require", "exports"], function (require, exports
     }
     exports.BooleanArray2D = BooleanArray2D;
 });
-define("colorreductionmanagement", ["require", "exports", "common", "lib/clustering", "lib/colorconversion", "settings", "structs/typedarrays"], function (require, exports, common_1, clustering_1, colorconversion_1, settings_1, typedarrays_1) {
+define("colorreductionmanagement", ["require", "exports", "common", "lib/clustering", "lib/colorconversion", "settings", "structs/typedarrays", "random"], function (require, exports, common_1, clustering_1, colorconversion_1, settings_1, typedarrays_1, random_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     class ColorMapResult {
@@ -422,8 +444,9 @@ define("colorreductionmanagement", ["require", "exports", "common", "lib/cluster
                     const vec = new clustering_1.Vector(data, weight);
                     vectors[vIdx++] = vec;
                 }
+                const random = new random_1.Random(settings.randomSeed);
                 // vectors of all the unique colors are built, time to cluster them
-                const kmeans = new clustering_1.KMeans(vectors, settings.kMeansNrOfClusters);
+                const kmeans = new clustering_1.KMeans(vectors, settings.kMeansNrOfClusters, random);
                 let curTime = new Date().getTime();
                 kmeans.step();
                 while (kmeans.currentDeltaDistanceDifference > settings.kMeansMinDeltaDifference) {
@@ -1657,7 +1680,7 @@ define("facetReducer", ["require", "exports", "colorreductionmanagement", "commo
         /**
          *  Remove all facets that have a pointCount smaller than the given number.
          */
-        static reduceFacets(smallerThan, removeFacetsFromLargeToSmall, colorsByIndex, facetResult, imgColorIndices, onUpdate = null) {
+        static reduceFacets(smallerThan, removeFacetsFromLargeToSmall, maximumNumberOfFacets, colorsByIndex, facetResult, imgColorIndices, onUpdate = null) {
             return __awaiter(this, void 0, void 0, function* () {
                 const visitedCache = new typedarrays_3.BooleanArray2D(facetResult.width, facetResult.height);
                 // build the color distance matrix, which describes the distance of each color to each other
@@ -1675,14 +1698,36 @@ define("facetReducer", ["require", "exports", "colorreductionmanagement", "commo
                     const f = facetResult.facets[facetProcessingOrder[fidx]];
                     // facets can be removed by merging by others due to a previous facet deletion
                     if (f != null && f.pointCount < smallerThan) {
-                        const facetToRemove = f;
-                        FacetReducer.deleteFacet(facetToRemove, facetResult, imgColorIndices, colorDistances, visitedCache);
+                        FacetReducer.deleteFacet(f.id, facetResult, imgColorIndices, colorDistances, visitedCache);
                         if (new Date().getTime() - curTime > 500) {
                             curTime = new Date().getTime();
                             yield common_4.delay(0);
                             if (onUpdate != null) {
-                                onUpdate(fidx / facetProcessingOrder.length);
+                                onUpdate(0.5 * fidx / facetProcessingOrder.length);
                             }
+                        }
+                    }
+                }
+                let facetCount = facetResult.facets.filter(f => f != null).length;
+                if (facetCount > maximumNumberOfFacets) {
+                    console.log(`There are still ${facetCount} facets, more than the maximum of ${maximumNumberOfFacets}. Removing the smallest facets`);
+                }
+                const startFacetCount = facetCount;
+                while (facetCount > maximumNumberOfFacets) {
+                    // because facets can be merged, reevaluate the order of facets to make sure the smallest one is removed 
+                    // this is slower but more accurate
+                    const facetProcessingOrder = facetResult.facets.filter((f) => f != null).slice(0)
+                        .sort((a, b) => b.pointCount > a.pointCount ? 1 : (b.pointCount < a.pointCount ? -1 : 0))
+                        .map((f) => f.id)
+                        .reverse();
+                    const facetToRemove = facetResult.facets[facetProcessingOrder[0]];
+                    FacetReducer.deleteFacet(facetToRemove.id, facetResult, imgColorIndices, colorDistances, visitedCache);
+                    facetCount = facetResult.facets.filter(f => f != null).length;
+                    if (new Date().getTime() - curTime > 500) {
+                        curTime = new Date().getTime();
+                        yield common_4.delay(0);
+                        if (onUpdate != null) {
+                            onUpdate(0.5 + 0.5 - (facetCount - maximumNumberOfFacets) / (startFacetCount - maximumNumberOfFacets));
                         }
                     }
                 }
@@ -1731,19 +1776,36 @@ define("facetReducer", ["require", "exports", "colorreductionmanagement", "commo
          * based on the distance of the neighbour border points. This results in a voronoi like filling in of the
          * void the deletion made
          */
-        static deleteFacet(facetToRemove, facetResult, imgColorIndices, colorDistances, visitedArrayCache) {
-            // there are many small facets, it's faster to just iterate over all points within its bounding box
-            // and seeing which belong to the facet than to keep track of the inner points (along with the border points)
-            // per facet, because that generates a lot of extra heap objects that need to be garbage collected each time
-            // a facet is rebuilt
-            for (let j = facetToRemove.bbox.minY; j <= facetToRemove.bbox.maxY; j++) {
-                for (let i = facetToRemove.bbox.minX; i <= facetToRemove.bbox.maxX; i++) {
-                    if (facetResult.facetMap.get(i, j) === facetToRemove.id) {
-                        const closestNeighbour = FacetReducer.getClosestNeighbourForPixel(facetToRemove, facetResult, i, j, colorDistances);
-                        // copy over color of closest neighbour
-                        imgColorIndices.set(i, j, facetResult.facets[closestNeighbour].color);
+        static deleteFacet(facetIdToRemove, facetResult, imgColorIndices, colorDistances, visitedArrayCache) {
+            const facetToRemove = facetResult.facets[facetIdToRemove];
+            if (facetToRemove === null) { // already removed
+                return;
+            }
+            if (facetToRemove.neighbourFacetsIsDirty) {
+                facetCreator_1.FacetCreator.buildFacetNeighbour(facetToRemove, facetResult);
+            }
+            if (facetToRemove.neighbourFacets.length > 0) {
+                // there are many small facets, it's faster to just iterate over all points within its bounding box
+                // and seeing which belong to the facet than to keep track of the inner points (along with the border points)
+                // per facet, because that generates a lot of extra heap objects that need to be garbage collected each time
+                // a facet is rebuilt
+                for (let j = facetToRemove.bbox.minY; j <= facetToRemove.bbox.maxY; j++) {
+                    for (let i = facetToRemove.bbox.minX; i <= facetToRemove.bbox.maxX; i++) {
+                        if (facetResult.facetMap.get(i, j) === facetToRemove.id) {
+                            const closestNeighbour = FacetReducer.getClosestNeighbourForPixel(facetToRemove, facetResult, i, j, colorDistances);
+                            if (closestNeighbour !== -1) {
+                                // copy over color of closest neighbour
+                                imgColorIndices.set(i, j, facetResult.facets[closestNeighbour].color);
+                            }
+                            else {
+                                console.warn(`No closest neighbour found for point ${i},${j}`);
+                            }
+                        }
                     }
                 }
+            }
+            else {
+                console.warn(`Facet ${facetToRemove.id} does not have any neighbours`);
             }
             // Rebuild all the neighbour facets that have been changed. While it could probably be faster by just adding the points manually
             // to the facet map and determine if the border points are still valid, it's more complex than that. It's possible that due to the change in points
@@ -1960,6 +2022,8 @@ define("facetCreator", ["require", "exports", "common", "lib/fill", "structs/bou
             facet.color = facetColorIndex;
             facet.bbox = new boundingbox_1.BoundingBox();
             facet.borderPoints = [];
+            facet.neighbourFacetsIsDirty = true; // not built neighbours yet
+            facet.neighbourFacets = null;
             fill_1.fill(x, y, facetResult.width, facetResult.height, (ptx, pty) => visited.get(ptx, pty) || imgColorIndices.get(ptx, pty) !== facetColorIndex, (ptx, pty) => {
                 visited.set(ptx, pty, true);
                 facetResult.facetMap.set(ptx, pty, facetIndex);
@@ -2701,7 +2765,7 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                 const reductionImgData = ctxReduction.getImageData(0, 0, cReduction.width, cReduction.height);
                 tabsOutput.select("reduction-pane");
                 $(".status.facetReduction").addClass("active");
-                yield facetReducer_1.FacetReducer.reduceFacets(settings.removeFacetsSmallerThanNrOfPoints, settings.removeFacetsFromLargeToSmall, colormapResult.colorsByIndex, facetResult, colormapResult.imgColorIndices, (progress) => {
+                yield facetReducer_1.FacetReducer.reduceFacets(settings.removeFacetsSmallerThanNrOfPoints, settings.removeFacetsFromLargeToSmall, settings.maximumNumberOfFacets, colormapResult.colorsByIndex, facetResult, colormapResult.imgColorIndices, (progress) => {
                     if (cancellationToken.isCancelled) {
                         throw new Error("Cancelled");
                     }
@@ -2992,9 +3056,11 @@ define("gui", ["require", "exports", "common", "guiprocessmanager", "settings"],
         else {
             settings.removeFacetsFromLargeToSmall = false;
         }
+        settings.randomSeed = parseInt($("#txtRandomSeed").val() + "");
         settings.kMeansNrOfClusters = parseInt($("#txtNrOfClusters").val() + "");
         settings.kMeansMinDeltaDifference = parseFloat($("#txtClusterPrecision").val() + "");
         settings.removeFacetsSmallerThanNrOfPoints = parseInt($("#txtRemoveFacetsSmallerThan").val() + "");
+        settings.maximumNumberOfFacets = parseInt($("#txtMaximumNumberOfFacets").val() + "");
         settings.nrOfTimesToHalveBorderSegments = parseInt($("#txtNrOfTimesToHalveBorderSegments").val() + "");
         settings.narrowPixelStripCleanupRuns = parseInt($("#txtNarrowPixelStripCleanupRuns").val() + "");
         settings.resizeImageIfTooLarge = $("#chkResizeImage").prop("checked");

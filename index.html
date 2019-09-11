@@ -85,6 +85,15 @@
                                         data-tooltip="The threshold delta distance of the k-means clustering to reach before stopping. Having a bigger value will speed up the clustering but may yield suboptimal clusters.">info</i>
                                 </label>
                             </div>
+                            
+                            <div class="input-field col s2">
+                                <input id="txtRandomSeed" type="number" value="0" min="0" step="1"
+                                    class="validate">
+                                <label for="txtRandomSeed">Random seed
+                                    <i class="material-icons tooltipped"
+                                        data-tooltip="The seed to use for the random number generator to choose the initial centroids for k-means clusering. Using the same seed ensures you will get the same result every time.">info</i>
+                                </label>
+                            </div>
                         </div>
                     </li>
                     <li class="collection-item">
@@ -129,7 +138,7 @@
                     </li>
                     <li class="collection-item">
                         <div class="row">
-                            <div class="input-field col s6">
+                            <div class="input-field col s4">
                                 <input id="txtNarrowPixelStripCleanupRuns" type="number" value="3" min="0"
                                     class="validate">
                                 <label for="txtNarrowPixelStripCleanupRuns">Number of runs for narrow pixel cleanup
@@ -137,12 +146,20 @@
                                         data-tooltip="Narrow pixel cleanup removes strips of single pixel rows, which would make some facets have some borders segments that are way too narrow to be useful. The small facet removal can introduce new narrow pixel strips, so this is repeated in a few iterative runs.">info</i>
                                 </label>
                             </div>
-                            <div class="input-field col s6">
+                            <div class="input-field col s4">
                                 <input id="txtRemoveFacetsSmallerThan" type="number" value="20" min="1"
                                     class="validate">
                                 <label for="txtRemoveFacetsSmallerThan">Remove small facets smaller than (pixels)
                                     <i class="material-icons tooltipped"
                                         data-tooltip="Removes any facets that are smaller than the given amount of pixels. Lowering the value will create more detailed results but might be much harder to actually paint due to their size.">info</i>
+                                </label>
+                            </div>
+                            <div class="input-field col s4">
+                                <input id="txtMaximumNumberOfFacets" type="number" value="100000" min="1"
+                                    class="validate">
+                                <label for="txtMaximumNumberOfFacets">Maximum number of facets
+                                    <i class="material-icons tooltipped"
+                                        data-tooltip="If there are more facets than the given maximum number, keep removing the smallest facets until the limit is reached">info</i>
                                 </label>
                             </div>
                         </div>

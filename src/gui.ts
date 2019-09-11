@@ -45,15 +45,17 @@ export function parseSettings(): Settings {
         settings.removeFacetsFromLargeToSmall = false;
     }
 
+    settings.randomSeed = parseInt($("#txtRandomSeed").val() + "");
     settings.kMeansNrOfClusters = parseInt($("#txtNrOfClusters").val() + "");
     settings.kMeansMinDeltaDifference = parseFloat($("#txtClusterPrecision").val() + "");
 
     settings.removeFacetsSmallerThanNrOfPoints = parseInt($("#txtRemoveFacetsSmallerThan").val() + "");
+    settings.maximumNumberOfFacets = parseInt($("#txtMaximumNumberOfFacets").val() + "");
 
     settings.nrOfTimesToHalveBorderSegments = parseInt($("#txtNrOfTimesToHalveBorderSegments").val() + "");
 
     settings.narrowPixelStripCleanupRuns = parseInt($("#txtNarrowPixelStripCleanupRuns").val() + "");
-    
+
     settings.resizeImageIfTooLarge = $("#chkResizeImage").prop("checked");
     settings.resizeImageWidth = parseInt($("#txtResizeWidth").val() + "");
     settings.resizeImageHeight = parseInt($("#txtResizeHeight").val() + "");

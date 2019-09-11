@@ -9,7 +9,7 @@ export class FacetReducer {
     /**
      *  Remove all facets that have a pointCount smaller than the given number.
      */
-    public static async reduceFacets(smallerThan: number, removeFacetsFromLargeToSmall: boolean, colorsByIndex: RGB[], facetResult: FacetResult, imgColorIndices: Uint8Array2D, onUpdate: ((progress: number) => void) | null = null) {
+    public static async reduceFacets(smallerThan: number, removeFacetsFromLargeToSmall: boolean, maximumNumberOfFacets: number, colorsByIndex: RGB[], facetResult: FacetResult, imgColorIndices: Uint8Array2D, onUpdate: ((progress: number) => void) | null = null) {
         const visitedCache = new BooleanArray2D(facetResult.width, facetResult.height);
 
         // build the color distance matrix, which describes the distance of each color to each other
@@ -30,20 +30,47 @@ export class FacetReducer {
             const f = facetResult.facets[facetProcessingOrder[fidx]];
             // facets can be removed by merging by others due to a previous facet deletion
             if (f != null && f.pointCount < smallerThan) {
-                const facetToRemove = f;
-                FacetReducer.deleteFacet(facetToRemove!, facetResult, imgColorIndices, colorDistances, visitedCache);
+                FacetReducer.deleteFacet(f.id, facetResult, imgColorIndices, colorDistances, visitedCache);
 
                 if (new Date().getTime() - curTime > 500) {
                     curTime = new Date().getTime();
                     await delay(0);
                     if (onUpdate != null) {
-                        onUpdate(fidx / facetProcessingOrder.length);
+                        onUpdate(0.5 * fidx / facetProcessingOrder.length);
                     }
                 }
             }
 
         }
 
+        let facetCount = facetResult.facets.filter(f => f != null).length;
+        if (facetCount > maximumNumberOfFacets) {
+            console.log(`There are still ${facetCount} facets, more than the maximum of ${maximumNumberOfFacets}. Removing the smallest facets`);
+        }
+        
+        const startFacetCount  = facetCount;
+        while (facetCount > maximumNumberOfFacets) {
+
+            // because facets can be merged, reevaluate the order of facets to make sure the smallest one is removed 
+            // this is slower but more accurate
+            const facetProcessingOrder = facetResult.facets.filter((f) => f != null).slice(0)
+                .sort((a, b) => b!.pointCount > a!.pointCount ? 1 : (b!.pointCount < a!.pointCount ? -1 : 0))
+                .map((f) => f!.id)
+                .reverse();
+
+            const facetToRemove = facetResult.facets[facetProcessingOrder[0]];
+
+            FacetReducer.deleteFacet(facetToRemove!.id, facetResult, imgColorIndices, colorDistances, visitedCache);
+            facetCount = facetResult.facets.filter(f => f != null).length;
+
+            if (new Date().getTime() - curTime > 500) {
+                curTime = new Date().getTime();
+                await delay(0);
+                if (onUpdate != null) {
+                    onUpdate(0.5 + 0.5 - (facetCount - maximumNumberOfFacets) / (startFacetCount - maximumNumberOfFacets));
+                }
+            }
+        }
         // this.trimFacets(facetResult, imgColorIndices, colorDistances, visitedCache);
 
         if (onUpdate != null) {
@@ -97,19 +124,36 @@ export class FacetReducer {
      * based on the distance of the neighbour border points. This results in a voronoi like filling in of the
      * void the deletion made
      */
-    private static deleteFacet(facetToRemove: Facet, facetResult: FacetResult, imgColorIndices: Uint8Array2D, colorDistances: number[][], visitedArrayCache: BooleanArray2D) {
-        // there are many small facets, it's faster to just iterate over all points within its bounding box
-        // and seeing which belong to the facet than to keep track of the inner points (along with the border points)
-        // per facet, because that generates a lot of extra heap objects that need to be garbage collected each time
-        // a facet is rebuilt
-        for (let j: number = facetToRemove.bbox.minY; j <= facetToRemove.bbox.maxY; j++) {
-            for (let i: number = facetToRemove.bbox.minX; i <= facetToRemove.bbox.maxX; i++) {
-                if (facetResult.facetMap.get(i, j) === facetToRemove.id) {
-                    const closestNeighbour = FacetReducer.getClosestNeighbourForPixel(facetToRemove, facetResult, i, j, colorDistances);
-                    // copy over color of closest neighbour
-                    imgColorIndices.set(i, j, facetResult.facets[closestNeighbour]!.color);
+    private static deleteFacet(facetIdToRemove: number, facetResult: FacetResult, imgColorIndices: Uint8Array2D, colorDistances: number[][], visitedArrayCache: BooleanArray2D) {
+        const facetToRemove = facetResult.facets[facetIdToRemove];
+        if (facetToRemove === null) { // already removed
+            return;
+        }
+
+        if (facetToRemove.neighbourFacetsIsDirty) {
+            FacetCreator.buildFacetNeighbour(facetToRemove, facetResult);
+        }
+
+        if (facetToRemove.neighbourFacets!.length > 0) {
+            // there are many small facets, it's faster to just iterate over all points within its bounding box
+            // and seeing which belong to the facet than to keep track of the inner points (along with the border points)
+            // per facet, because that generates a lot of extra heap objects that need to be garbage collected each time
+            // a facet is rebuilt
+            for (let j: number = facetToRemove.bbox.minY; j <= facetToRemove.bbox.maxY; j++) {
+                for (let i: number = facetToRemove.bbox.minX; i <= facetToRemove.bbox.maxX; i++) {
+                    if (facetResult.facetMap.get(i, j) === facetToRemove.id) {
+                        const closestNeighbour = FacetReducer.getClosestNeighbourForPixel(facetToRemove, facetResult, i, j, colorDistances);
+                        if (closestNeighbour !== -1) {
+                            // copy over color of closest neighbour
+                            imgColorIndices.set(i, j, facetResult.facets[closestNeighbour]!.color);
+                        } else {
+                            console.warn(`No closest neighbour found for point ${i},${j}`);
+                        }
+                    }
                 }
             }
+        } else {
+            console.warn(`Facet ${facetToRemove.id} does not have any neighbours`);
         }
 
         // Rebuild all the neighbour facets that have been changed. While it could probably be faster by just adding the points manually
@@ -224,6 +268,7 @@ export class FacetReducer {
                 // rebuild the neighbour facet
                 const newFacet = FacetCreator.buildFacet(neighbourIdx, neighbour.color, neighbour.borderPoints[0].x, neighbour.borderPoints[0].y, visitedArrayCache, imgColorIndices, facetResult);
                 facetResult.facets[neighbourIdx] = newFacet;
+
                 // it's possible that any of the neighbour facets are now overlapping
                 // because if for example facet Red - Green - Red, Green is removed
                 // then it will become Red - Red and both facets will overlap

@@ -168,7 +168,7 @@ export class GUIProcessManager {
         const reductionImgData = ctxReduction.getImageData(0, 0, cReduction.width, cReduction.height);
         tabsOutput.select("reduction-pane");
         $(".status.facetReduction").addClass("active");
-        await FacetReducer.reduceFacets(settings.removeFacetsSmallerThanNrOfPoints, settings.removeFacetsFromLargeToSmall, colormapResult.colorsByIndex, facetResult, colormapResult.imgColorIndices, (progress) => {
+        await FacetReducer.reduceFacets(settings.removeFacetsSmallerThanNrOfPoints, settings.removeFacetsFromLargeToSmall, settings.maximumNumberOfFacets, colormapResult.colorsByIndex, facetResult, colormapResult.imgColorIndices, (progress) => {
             if (cancellationToken.isCancelled) {
                 throw new Error("Cancelled");
             }
