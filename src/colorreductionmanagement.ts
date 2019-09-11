@@ -6,6 +6,7 @@ import { KMeans, Vector } from "./lib/clustering";
 import { hslToRgb, lab2rgb, rgb2lab, rgbToHsl } from "./lib/colorconversion";
 import { ClusteringColorSpace, Settings } from "./settings";
 import { Uint8Array2D } from "./structs/typedarrays";
+import { Random } from "./random";
 
 export class ColorMapResult {
     public imgColorIndices!: Uint8Array2D;
@@ -112,8 +113,9 @@ export class ColorReducer {
             vectors[vIdx++] = vec;
         }
 
+        const random = new Random(settings.randomSeed);
         // vectors of all the unique colors are built, time to cluster them
-        const kmeans = new KMeans(vectors, settings.kMeansNrOfClusters);
+        const kmeans = new KMeans(vectors, settings.kMeansNrOfClusters, random);
 
         let curTime = new Date().getTime();
 

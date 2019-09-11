@@ -24,4 +24,6 @@ export class Settings {
     public resizeImageIfTooLarge: boolean = true;
     public resizeImageWidth: number = 1024;
     public resizeImageHeight: number = 1024;
+
+    public randomSeed: number = new Date().getTime();
 }

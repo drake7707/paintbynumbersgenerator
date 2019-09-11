@@ -1,3 +1,4 @@
+import { Random } from "../random";
 
 export class Vector {
 
@@ -51,7 +52,7 @@ export class KMeans {
     public centroids: Vector[] = [];
     public currentDeltaDistanceDifference: number = 0;
 
-    constructor(private points: Vector[], public k: number, centroids: Vector[] | null = null) {
+    constructor(private points: Vector[], public k: number, private random:Random, centroids: Vector[] | null = null) {
 
         if (centroids != null) {
             this.centroids = centroids;
@@ -65,7 +66,7 @@ export class KMeans {
 
     private initCentroids() {
         for (let i: number = 0; i < this.k; i++) {
-            this.centroids.push(this.points[Math.floor(this.points.length * Math.random())]);
+            this.centroids.push(this.points[Math.floor(this.points.length * this.random.next())]);
             this.pointsPerCategory.push([]);
         }
     }
