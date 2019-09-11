@@ -47,8 +47,8 @@ export class FacetReducer {
         if (facetCount > maximumNumberOfFacets) {
             console.log(`There are still ${facetCount} facets, more than the maximum of ${maximumNumberOfFacets}. Removing the smallest facets`);
         }
-        
-        const startFacetCount  = facetCount;
+
+        const startFacetCount = facetCount;
         while (facetCount > maximumNumberOfFacets) {
 
             // because facets can be merged, reevaluate the order of facets to make sure the smallest one is removed 
