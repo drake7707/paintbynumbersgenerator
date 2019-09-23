@@ -1,17 +1,16 @@
 import { delay } from "./common";
+import { FacetResult, OrientationEnum, PathPoint } from "./facetmanagement";
 import { Point } from "./structs/point";
-import { FacetResult, PathPoint, OrientationEnum } from "./facetmanagement";
-
+import { simplify } from "./lib/simplify";
 
 /**
  *  Path segment is a segment of a border path that is adjacent to a specific neighbour facet
  */
 export class PathSegment {
-    constructor(public points: PathPoint[], public neighbour: number) {
+    constructor(public points: PathPoint[], public readonly neighbour: number, public readonly id: number) {
 
     }
 }
-
 
 /**
  * Facet boundary segment describes the matched segment that is shared between 2 facets
@@ -47,9 +46,12 @@ export class FacetBorderSegmenter {
      *  Chops up the border paths per facet into segments adjacent tothe same neighbour
      */
     private static prepareSegmentsPerFacet(facetResult: FacetResult) {
+
         const segmentsPerFacet: Array<Array<PathSegment | null>> = new Array(facetResult.facets.length);
+        let newSegmentId = 0;
         for (const f of facetResult.facets) {
             if (f != null) {
+
                 const segments: PathSegment[] = [];
                 if (f.borderPath.length > 1) {
                     let currentPoints: PathPoint[] = [];
@@ -60,10 +62,10 @@ export class FacetBorderSegmenter {
                         const oldNeighbour = prevBorderPoint.getNeighbour(facetResult);
                         const curNeighbour = curBorderPoint.getNeighbour(facetResult);
                         let isTransitionPoint = false;
+
                         if (oldNeighbour !== curNeighbour) {
                             isTransitionPoint = true;
-                        }
-                        else {
+                        } else {
                             // it's possible that due to inner facets inside the current facet that the
                             // border is interrupted on that facet's side, but not on the neighbour's side
                             if (oldNeighbour !== -1) {
@@ -84,22 +86,19 @@ export class FacetBorderSegmenter {
                                         if (diagNeighbour !== oldNeighbour) {
                                             isTransitionPoint = true;
                                         }
-                                    }
-                                    else if ((prevBorderPoint.orientation === OrientationEnum.Top && curBorderPoint.orientation === OrientationEnum.Right) ||
+                                    } else if ((prevBorderPoint.orientation === OrientationEnum.Top && curBorderPoint.orientation === OrientationEnum.Right) ||
                                         (prevBorderPoint.orientation === OrientationEnum.Right && curBorderPoint.orientation === OrientationEnum.Top)) {
                                         const diagNeighbour = facetResult.facetMap.get(curBorderPoint.x + 1, curBorderPoint.y - 1);
                                         if (diagNeighbour !== oldNeighbour) {
                                             isTransitionPoint = true;
                                         }
-                                    }
-                                    else if ((prevBorderPoint.orientation === OrientationEnum.Bottom && curBorderPoint.orientation === OrientationEnum.Left) ||
+                                    } else if ((prevBorderPoint.orientation === OrientationEnum.Bottom && curBorderPoint.orientation === OrientationEnum.Left) ||
                                         (prevBorderPoint.orientation === OrientationEnum.Left && curBorderPoint.orientation === OrientationEnum.Bottom)) {
                                         const diagNeighbour = facetResult.facetMap.get(curBorderPoint.x - 1, curBorderPoint.y + 1);
                                         if (diagNeighbour !== oldNeighbour) {
                                             isTransitionPoint = true;
                                         }
-                                    }
-                                    else if ((prevBorderPoint.orientation === OrientationEnum.Bottom && curBorderPoint.orientation === OrientationEnum.Right) ||
+                                    } else if ((prevBorderPoint.orientation === OrientationEnum.Bottom && curBorderPoint.orientation === OrientationEnum.Right) ||
                                         (prevBorderPoint.orientation === OrientationEnum.Right && curBorderPoint.orientation === OrientationEnum.Bottom)) {
                                         const diagNeighbour = facetResult.facetMap.get(curBorderPoint.x + 1, curBorderPoint.y + 1);
                                         if (diagNeighbour !== oldNeighbour) {
@@ -114,7 +113,8 @@ export class FacetBorderSegmenter {
                             // aha! a transition point, create the current points as new segment
                             // and start a new list
                             if (currentPoints.length > 1) {
-                                const segment = new PathSegment(currentPoints, oldNeighbour);
+                                const segment = new PathSegment(currentPoints, oldNeighbour, newSegmentId);
+                                newSegmentId++;
                                 segments.push(segment);
                                 currentPoints = [curBorderPoint];
                             }
@@ -130,10 +130,10 @@ export class FacetBorderSegmenter {
                             // add the current points to the first segment by prefixing it
                             const mergedPoints = currentPoints.concat(segments[0].points);
                             segments[0].points = mergedPoints;
-                        }
-                        else {
+                        } else {
                             // add the remainder as final segment
-                            const segment = new PathSegment(currentPoints, oldNeighbour);
+                            const segment = new PathSegment(currentPoints, oldNeighbour, newSegmentId);
+                            newSegmentId++;
                             segments.push(segment);
                             currentPoints = [];
                         }
@@ -144,7 +144,7 @@ export class FacetBorderSegmenter {
         }
         return segmentsPerFacet;
     }
-    
+
     /**
      * Reduces each segment border path points
      */
@@ -152,9 +152,10 @@ export class FacetBorderSegmenter {
         for (const f of facetResult.facets) {
             if (f != null) {
                 for (const segment of segmentsPerFacet[f.id]) {
-                    for (let i: number = 0; i < nrOfTimesToHalvePoints; i++) {
-                        segment!.points = FacetBorderSegmenter.reduceSegmentHaarWavelet(segment!.points, true, facetResult.width, facetResult.height);
-                    }
+                    segment!.points = simplify(segment!.points, 1, true);
+                    //for (let i: number = 0; i < nrOfTimesToHalvePoints; i++) {
+                    //segment!.points = FacetBorderSegmenter.reduceSegmentHaarWavelet(segment!.points, true, facetResult.width, facetResult.height);
+                    //}
                 }
             }
         }
@@ -176,8 +177,7 @@ export class FacetBorderSegmenter {
                 const cx = (newpath[i].x + newpath[i + 1].x) / 2;
                 const cy = (newpath[i].y + newpath[i + 1].y) / 2;
                 reducedPath.push(new PathPoint(new Point(cx, cy), OrientationEnum.Left));
-            }
-            else {
+            } else {
                 reducedPath.push(newpath[i]);
                 reducedPath.push(newpath[i + 1]);
             }
@@ -249,15 +249,14 @@ export class FacetBorderSegmenter {
                                         let matchesReverse = (segStartPoint.distanceTo(nSegEndPoint) <= MAX_DISTANCE &&
                                             segEndPoint.distanceTo(nSegStartPoint) <= MAX_DISTANCE);
                                         if (matchesStraight && matchesReverse) {
-                                            // dang it , both match, it must be a tiny segment, but when placed wrongly it'll overlap in the path creating an hourglass 
+                                            // dang it , both match, it must be a tiny segment, but when placed wrongly it'll overlap in the path creating an hourglass
                                             //  e.g. https://i.imgur.com/XZQhxRV.png
                                             // determine which is the closest
                                             if (segStartPoint.distanceTo(nSegStartPoint) + segEndPoint.distanceTo(nSegEndPoint) <
                                                 segStartPoint.distanceTo(nSegEndPoint) + segEndPoint.distanceTo(nSegStartPoint)) {
                                                 matchesStraight = true;
                                                 matchesReverse = false;
-                                            }
-                                            else {
+                                            } else {
                                                 matchesStraight = false;
                                                 matchesReverse = true;
                                             }
@@ -274,8 +273,7 @@ export class FacetBorderSegmenter {
                                             segmentsPerFacet[neighbourFacet.id][ns] = null;
                                             matchFound = true;
                                             break;
-                                        }
-                                        else if (matchesReverse) {
+                                        } else if (matchesReverse) {
                                             // start & end points match  but in reverse order
                                             if (debug) {
                                                 console.log("Reverse match found for facet " + f.id + " to neighbour " + neighbourFacet.id);

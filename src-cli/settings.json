@@ -15,7 +15,7 @@
     },
     "removeFacetsSmallerThanNrOfPoints": 20,
     "removeFacetsFromLargeToSmall": true,
-    "maximumNumberOfFacets": 100,
+    "maximumNumberOfFacets": 100000,
     "nrOfTimesToHalveBorderSegments": 2,
     "narrowPixelStripCleanupRuns": 3,
     "resizeImageIfTooLarge": true,

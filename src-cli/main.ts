@@ -5,7 +5,7 @@ import * as path from "path";
 import * as process from "process";
 import { ColorReducer } from "../src/colorreductionmanagement";
 import { RGB } from "../src/common";
-import { FacetBorderSegmenter } from "../src/facetBorderSegmenter";
+import { FacetBorderSegmenter, FacetBoundarySegment } from "../src/facetBorderSegmenter";
 import { FacetBorderTracer } from "../src/facetBorderTracer";
 import { FacetCreator } from "../src/facetCreator";
 import { FacetLabelPlacer } from "../src/facetLabelPlacer";
@@ -236,31 +236,75 @@ async function createSVG(facetResult: FacetResult, colorsByIndex: RGB[], sizeMul
     for (const f of facetResult.facets) {
 
         if (f != null && f.borderSegments.length > 0) {
-            let newpath: Point[] = [];
-            const useSegments = true;
-            if (useSegments) {
-                newpath = f.getFullPathFromBorderSegments(false);
-            } else {
-                for (let i: number = 0; i < f.borderPath.length; i++) {
-                    newpath.push(new Point(f.borderPath[i].getWallX() + 0.5, f.borderPath[i].getWallY() + 0.5));
+            let lastSegment: FacetBoundarySegment | null = null;
+
+            let pathData = "M ";
+            let pointCount = 0;
+            for (const seg of f.borderSegments) {
+
+                const newpath: Point[] = [];
+
+                // fix for the continuitity of the border segments. If transition points between border segments on the path aren't repeated, the
+                // borders of the facets aren't always matching up leaving holes when rendered
+                if (lastSegment != null) {
+                    if (lastSegment.reverseOrder) {
+                        newpath.push(lastSegment.originalSegment.points[0]);
+                    } else {
+                        newpath.push(lastSegment.originalSegment.points[lastSegment.originalSegment.points.length - 1]);
+                    }
                 }
+
+                for (let i: number = 0; i < seg.originalSegment.points.length; i++) {
+                    const idx = seg.reverseOrder ? (seg.originalSegment.points.length - 1 - i) : i;
+                    newpath.push(seg.originalSegment.points[idx]);
+                }
+
+                for (let i = 0; i < newpath.length; i++) {
+
+                    const isAnchorPoint = pointCount === 0 || i === 0 || i >= newpath.length - 2;
+
+                    if (pointCount === 0) {
+                        pathData += newpath[i].x * sizeMultiplier + " " + newpath[0].y * sizeMultiplier + " ";
+                    } else {
+                        if (isAnchorPoint) {
+                            pathData += `L ${newpath[i].x * sizeMultiplier}  ${newpath[i].y * sizeMultiplier} `;
+                        } else {
+                            const midpointX = newpath[i].x;
+                            const midpointY = newpath[i].y;
+
+                            const midpoint2X = newpath[i + 1].x;
+                            const midpoint2Y = newpath[i + 1].y;
+                            //pathData += "Q " + (midpointX * sizeMultiplier) + " " + (midpointY * sizeMultiplier) + " " + (newpath[i + 1].x * sizeMultiplier) + " " + (newpath[i + 1].y * sizeMultiplier) + " ";
+                            pathData += "C " + (midpointX * sizeMultiplier) + " " + (midpointY * sizeMultiplier) + " " + (midpoint2X * sizeMultiplier) + " " + (midpoint2Y * sizeMultiplier) + " " + (newpath[i + 2].x * sizeMultiplier) + " " + (newpath[i + 2].y * sizeMultiplier) + " ";
+                            // skip over the next point because that's already been used
+                            if (i + 2 <= newpath.length) {
+                                i++;
+                                i++;
+                            }
+                        }
+                    }
+
+                    pointCount++;
+                }
+                lastSegment = seg;
             }
-            if (newpath[0].x !== newpath[newpath.length - 1].x || newpath[0].y !== newpath[newpath.length - 1].y) {
-                newpath.push(newpath[0]);
-            } // close loop if necessary
+
+            // if (newpath[0].x !== newpath[newpath.length - 1].x || newpath[0].y !== newpath[newpath.length - 1].y) {
+            //     newpath.push(newpath[0]);
+            // } // close loop if necessary
 
             // Create a path in SVG's namespace
             // using quadratic curve absolute positions
 
             let svgPathString = "";
 
-            let data = "M ";
-            data += newpath[0].x * sizeMultiplier + " " + newpath[0].y * sizeMultiplier + " ";
-            for (let i: number = 1; i < newpath.length; i++) {
-                const midpointX = (newpath[i].x + newpath[i - 1].x) / 2;
-                const midpointY = (newpath[i].y + newpath[i - 1].y) / 2;
-                data += "Q " + (midpointX * sizeMultiplier) + " " + (midpointY * sizeMultiplier) + " " + (newpath[i].x * sizeMultiplier) + " " + (newpath[i].y * sizeMultiplier) + " ";
-            }
+            /* for (let i: number = 1; i < newpath.length - 1; i += 2) {
+                 // const midpointX = (newpath[i].x + newpath[i - 1].x) / 2;
+                 // const midpointY = (newpath[i].y + newpath[i - 1].y) / 2;
+                 const midpointX = newpath[i].x;
+                 const midpointY = newpath[i].y;
+                 pathData += "Q " + (midpointX * sizeMultiplier) + " " + (midpointY * sizeMultiplier) + " " + (newpath[i + 1].x * sizeMultiplier) + " " + (newpath[i + 1].y * sizeMultiplier) + " ";
+             }*/
 
             let svgStroke = "";
             if (stroke) {
@@ -280,7 +324,7 @@ async function createSVG(facetResult: FacetResult, colorsByIndex: RGB[], sizeMul
                 svgFill = "none";
             }
 
-            svgPathString = `<path data-facetId="${f.id}" d="${data}" `;
+            svgPathString = `<path data-facetId="${f.id}" d="${pathData}" `;
 
             svgPathString += `style="`;
             svgPathString += `fill: ${svgFill};`;
