@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Paint by number generator</title>
+    <link rel="stylesheet" href="styles/lib/materialize.min.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <link rel='stylesheet' href='styles/main.css' />
+</head>
+
+<body>
+    <div class="container">
+        <div class="row">
+            <h2> Paint by number generator </h2>
+            <span>Paste from clipboard (ctrl+v) to change the image (or browse for a file <input id="file" type="file"
+                    accept="image/x-png,image/gif,image/jpeg"></input>). Large images are very slow to process
+                though.</span>
+            <br />
+            <span>Example images:
+                <a id="lnkTrivial" href="#">trivial</a> -
+                <a id="lnkSmall" href="#">small</a> -
+                <a id="lnkMedium" href="#">medium</a>
+            </span>
+        </div>
+        <div class="row">
+            <div class="col s12">
+                <ul class="tabs">
+                    <li class="tab col s2">
+                        <a href="#input-pane">Input</a>
+                    </li>
+                    <li class="tab col s2">
+                        <a href="#options-pane">Options</a>
+                    </li>
+                </ul>
+            </div>
+            <div id="input-pane" class="col s12">
+                <canvas id="canvas"></canvas>
+                <img id="imgTrivial" crossorigin="anonymous" src="https://i.imgur.com/o5CqO57.png"
+                    style="display:none" />
+                <img id="imgSmall" crossorigin="anonymous" src="https://i.imgur.com/S0D3kXZ.jpg" style="display:none" />
+
+                <img id="imgMedium" crossorigin="anonymous" src="https://i.imgur.com/nLeNgYbr.jpg"
+                    style="display:none" />
+            </div>
+            <!-- I suck at materializecss design, in case you haven't noticed yet -->
+            <div id="options-pane" class="col s12">
+                <ul class="collection">
+                    <li class="collection-item">
+                        <div class="row">
+                            <div class="col s3" style="margin-top: 34px;">
+                                <label>
+                                    <input id="chkResizeImage" type="checkbox" checked="checked" />
+                                    <span>Resize image larger than
+                                        <i class="material-icons tooltipped"
+                                            data-tooltip="If checked and the input image is larger than the given dimensions then it will be resized to fit but will maintain its ratio.">info</i>
+                                    </span>
+                                </label>
+                            </div>
+                            <div class="col s2">
+                                <label for="txtResizeWidth">width</label>
+                                <input id="txtResizeWidth" type="number" value="1024" min="1" class="validate">
+                            </div>
+                            <div class="col s2">
+                                <label for="txtResizeHeight">height</label>
+                                <input id="txtResizeHeight" type="number" value="1024" min="1" class="validate">
+                            </div>
+                        </div>
+                    </li>
+                    <li class="collection-item">
+                        <div class="row">
+                            <div class="input-field col s2">
+                                <input id="txtNrOfClusters" type="number" value="16" min="1" class="validate">
+                                <label for="txtNrOfClusters">Number of colors
+                                    <i class="material-icons tooltipped"
+                                        data-tooltip="The number of colors to quantize the image to">info</i>
+                                </label>
+                            </div>
+
+                            <div class="input-field col s2">
+                                <input id="txtClusterPrecision" type="number" value="1" min="1" step="0.05"
+                                    class="validate">
+                                <label for="txtClusterPrecision">Cluster precision
+                                    <i class="material-icons tooltipped"
+                                        data-tooltip="The threshold delta distance of the k-means clustering to reach before stopping. Having a bigger value will speed up the clustering but may yield suboptimal clusters.">info</i>
+                                </label>
+                            </div>
+                            
+                            <div class="input-field col s2">
+                                <input id="txtRandomSeed" type="number" value="0" min="0" step="1"
+                                    class="validate">
+                                <label for="txtRandomSeed">Random seed
+                                    <i class="material-icons tooltipped"
+                                        data-tooltip="The seed to use for the random number generator to choose the initial centroids for k-means clusering. Using the same seed ensures you will get the same result every time.">info</i>
+                                </label>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="collection-item">
+                        <div class="row">
+
+                            <div class="col s3">
+                                <label>Clustering color space
+                                    <i class="material-icons tooltipped"
+                                        data-tooltip="The color space to apply clustering in">info</i>
+                                </label>
+                            </div>
+                            <div class="col s2">
+                                <label>
+                                    <input id="optColorSpaceRGB" name="colorspace" type="radio" checked />
+                                    <span>RGB</span>
+                                </label>
+                            </div>
+                            <div class="col s2">
+                                <label>
+                                    <input id="optColorSpaceHSL" name="colorspace" type="radio" />
+                                    <span>HSL</span>
+                                </label>
+                            </div>
+                            <div class="col s2">
+                                <label>
+                                    <input id="optColorSpaceLAB" name="colorspace" type="radio" />
+                                    <span>Lab</span>
+                                </label>
+                            </div>
+
+                            <div class="col s12">
+                                <label for="txtKMeansColorRestrictions">Restrict clustering colors
+                                    <i class="material-icons tooltipped"
+                                        data-tooltip="Specify which colors should be used, one per line in 'r,g,b' format. Use // as comment. If no colors are specified no restrictions are applied. Useful if you only have a few colors of paint on hand.">info</i>
+                                </label>
+                                <textarea id="txtKMeansColorRestrictions" class="materialize-textarea validate">
+//0,0,0
+//255,255,255
+</textarea>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="collection-item">
+                        <div class="row">
+                            <div class="input-field col s4">
+                                <input id="txtNarrowPixelStripCleanupRuns" type="number" value="3" min="0"
+                                    class="validate">
+                                <label for="txtNarrowPixelStripCleanupRuns">Number of runs for narrow pixel cleanup
+                                    <i class="material-icons tooltipped"
+                                        data-tooltip="Narrow pixel cleanup removes strips of single pixel rows, which would make some facets have some borders segments that are way too narrow to be useful. The small facet removal can introduce new narrow pixel strips, so this is repeated in a few iterative runs.">info</i>
+                                </label>
+                            </div>
+                            <div class="input-field col s4">
+                                <input id="txtRemoveFacetsSmallerThan" type="number" value="20" min="1"
+                                    class="validate">
+                                <label for="txtRemoveFacetsSmallerThan">Remove small facets smaller than (pixels)
+                                    <i class="material-icons tooltipped"
+                                        data-tooltip="Removes any facets that are smaller than the given amount of pixels. Lowering the value will create more detailed results but might be much harder to actually paint due to their size.">info</i>
+                                </label>
+                            </div>
+                            <div class="input-field col s4">
+                                <input id="txtMaximumNumberOfFacets" type="number" value="100000" min="1"
+                                    class="validate">
+                                <label for="txtMaximumNumberOfFacets">Maximum number of facets
+                                    <i class="material-icons tooltipped"
+                                        data-tooltip="If there are more facets than the given maximum number, keep removing the smallest facets until the limit is reached">info</i>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="input-field col s6">
+                                <div class="row">
+                                    <div class="col s4">
+                                        <label>Small facet removal order
+                                            <i class="material-icons tooltipped"
+                                                data-tooltip="Largest to smallest will prevent boundaries from warping the shapes because the smaller facets act as border anchorpoints but can be considerably slower">info</i>
+                                        </label>
+                                    </div>
+                                    <div class="col s4">
+                                        <label>
+                                            <input id="optFacetRemovalLargestToSmallest" name="smallfacetremovalorder"
+                                                type="radio" checked />
+                                            <span>Largest to smallest</span>
+                                        </label>
+                                    </div>
+                                    <div class="col s4">
+                                        <label>
+                                            <input id="optFacetRemovalSmallestToLargest" name="smallfacetremovalorder"
+                                                type="radio" />
+                                            <span>Smallest to largest</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </li>
+                    <li class="collection-item">
+                        <div class="row">
+                            <div class="input-field col s5">
+                                <input id="txtNrOfTimesToHalveBorderSegments" type="number" value="2" min="0"
+                                    class="validate">
+                                <label for="txtNrOfTimesToHalveBorderSegments">Amount of times to halve border segment
+                                    complexity)
+                                    <i class="material-icons tooltipped"
+                                        data-tooltip="Reducing the amount of points in a border segment (using haar wavelet reduction) will smooth out the quadratic curve more but at a loss of detail. <br/>A segment (shared border with a facet) will always retain its start and end point.">info</i>
+                                </label>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+
+            </div>
+
+            <div class="col s12">
+                <a class="waves-effect waves-light btn" id="btnProcess">Process image</a>
+            </div>
+        </div>
+
+        <div class="row">
+
+            <div class="col s2">
+                <div class="status kMeans">
+                    K-means clustering
+                    <div class="progress">
+                        <div id="statusKMeans" class="determinate" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col s2">
+                <div class="status facetBuilding">
+                    Facet building
+                    <div class="progress">
+                        <div id="statusFacetBuilding" class="determinate" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col s2">
+                <div class="status facetReduction">
+                    Small facet pruning
+                    <div class="progress">
+                        <div id="statusFacetReduction" class="determinate" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col s2">
+                <div class="status facetBorderPath">
+                    Border detection
+                    <div class="progress">
+                        <div id="statusFacetBorderPath" class="determinate" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col s2">
+                <div class="status facetBorderSegmentation">
+                    Border segmentation
+                    <div class="progress">
+                        <div id="statusFacetBorderSegmentation" class="determinate" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col s2">
+                <div class="status facetLabelPlacement">
+                    Label placement
+                    <div class="progress">
+                        <div id="statusFacetLabelPlacement" class="determinate" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col s2">
+                <div class="status SVGGenerate">
+                    SVG generation
+                    <div class="progress">
+                        <div id="statusSVGGenerate" class="determinate" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col s12">
+                <ul id="tabsOutput" class="tabs">
+                    <li class="tab col s2">
+                        <a href="#kmeans-pane">Quantized image</a>
+                    </li>
+                    <li class="tab col s2">
+                        <a href="#reduction-pane">Facet reduction</a>
+                    </li>
+                    <li class="tab col s2">
+                        <a href="#borderpath-pane">Border tracing</a>
+                    </li>
+                    <li class="tab col s2">
+                        <a href="#bordersegmentation-pane">Border segmentation</a>
+                    </li>
+                    <li class="tab col s2">
+                        <a href="#labelplacement-pane">Label placement</a>
+                    </li>
+                    <li class="tab col s2">
+                        <a href="#output-pane">Output</a>
+                    </li>
+                    <li class="tab col s2">
+                        <a href="#log-pane">Log</a>
+                    </li>
+                </ul>
+            </div>
+            <div id="kmeans-pane" class="col s12">
+                <canvas id="cKMeans"></canvas>
+            </div>
+            <div id="reduction-pane" class="col s12">
+                <canvas id="cReduction"></canvas>
+            </div>
+            <div id="borderpath-pane" class="col s12">
+                <canvas id="cBorderPath"></canvas>
+            </div>
+            <div id="bordersegmentation-pane" class="col s12">
+                <canvas id="cBorderSegmentation"></canvas>
+            </div>
+            <div id="labelplacement-pane" class="col s12">
+                <canvas id="cLabelPlacement"></canvas>
+            </div>
+
+            <div id="output-pane" class="col s12">
+                <div class="row">
+                    <div class="col s2">
+                        <label>SVG Render options</label>
+                    </div>
+                    <div class="col s2">
+                        <label>
+                            <input id="chkShowLabels" type="checkbox" checked="checked" />
+                            <span>Show labels</span>
+                        </label>
+                    </div>
+                    <div class="col s2">
+                        <label>
+                            <input id="chkFillFacets" type="checkbox" checked="checked" />
+                            <span>Fill facets</span>
+                        </label>
+                    </div>
+                    <div class="col s2">
+
+                        <label>
+                            <input id="chkShowBorders" type="checkbox" checked="checked" />
+                            <span>Show borders</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col s3">
+                        <div class="input-field">
+                            <input placeholder="SVG Size multiplier" id="txtSizeMultiplier" type="number" value="3"
+                                min="1" class="validate">
+                            <label for="txtSizeMultiplier">SVG size multiplier
+                                <i class="material-icons tooltipped"
+                                    data-tooltip="Increases the SVG size compared to the original image, useful when the labels don't fit inside the tiny segments">info</i>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col s3">
+                        <div class="input-field">
+                            <input placeholder="Label font size" id="txtLabelFontSize" type="number" value="50" min="1"
+                                max="100">
+                            <label for="txtLabelFontSize">Label font size
+                                <i class="material-icons tooltipped"
+                                    data-tooltip="Font size of the color number labels in each facet, in percentage relative to the largest circle found inside a facet.">info</i>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col s3">
+                        <div class="input-field">
+                            <input placeholder="Label font size" id="txtLabelFontColor" type="text" value="#000">
+                            <label for="txtLabelFontColor">Label font color
+                                <i class="material-icons tooltipped"
+                                    data-tooltip="Font color of the color number labels in each facet">info</i>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div id="palette" class="palette">
+
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col s12">
+                        <div id="svgContainer">
+
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col s3">
+                        <a class="waves-effect waves-light btn" id="btnDownloadSVG">Download SVG</a>
+                    </div>
+                    <div class="col s3">
+                        <a class="waves-effect waves-light btn" id="btnDownloadPNG">Download PNG</a>
+                    </div>
+                    <div class="col s3">
+                        <a class="waves-effect waves-light btn" id="btnDownloadPalettePNG">Download palette</a>
+                    </div>
+                </div>
+            </div>
+
+            <div id="log-pane" class="col s12">
+                <div class="row">
+                    <div class="col s12">
+                        <div id="log"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div style="position:absolute;top:3px;right:3px;font-size:0.7em">
+        Created by
+        <a href="http://dwight.skyon.be/">drake7707</a>
+    </div>
+
+
+    <script src="scripts/lib/saveSvgAsPng.js"></script>
+    <script src="scripts/lib/require.js"></script>
+    <script src="scripts/lib/jquery-1.11.0.min.js"></script>
+    <script src="scripts/lib/materialize.min.js"></script>
+    <script src='scripts/main.js'></script>
+    <script>
+        requirejs(['main'], function (MyApp) {
+
+        });
+    </script>
+</body>
+
+</html>

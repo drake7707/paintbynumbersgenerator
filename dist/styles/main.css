@@ -1,0 +1,56 @@
+.status {
+    background-color: white;
+    padding: 10px;
+    overflow: hidden;
+}
+
+.status.active {
+    animation-name: color;
+    animation-duration: 4s;
+    animation-iteration-count: infinite;
+}
+
+.status.complete {
+    background-color: #CCFFC6;
+}
+
+@keyframes color {
+    0% {
+        background-color: #FFF;
+    }
+    50% {
+        background-color: #CCFFC6;
+    }
+    100% {
+        background-color: #FFF;
+    }
+}
+
+.palette .color {
+    float: left;
+    width: 40px;
+    height: 40px;
+    border: 1px solid #AAA;
+    border-radius: 5px;
+    text-align: center;
+    padding: 5px;
+    font-weight: 600;
+    margin: 5px;
+    text-shadow: #FFF 0px 0px 5px;
+}
+
+.collection-item > .row {
+    margin-bottom:0px;
+}
+
+#input-pane {
+    overflow: auto;
+    max-width: 100%;
+    max-height: 500px;
+}
+
+#svgContainer {
+    overflow: auto;
+    max-width: 100%;
+    max-height: 500px;
+}
