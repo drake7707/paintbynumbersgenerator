@@ -39,11 +39,21 @@ jobs:
       name: "Copy binary to out directory"
     - run: copy .\node_modules\canvas\build\Release\* .\out
       name: "Copy node-canvas binaries to output"
+    - run: del *.pdb *.ipdb *.iobj
+      name: "Cleanup unnecessary debug files"
     - uses: actions/upload-artifact@v2
-      name: "Upload executable as artifact"
+      name: "Upload out as artifact"
       with:
         name: paint-by-numbers-generator-win
         path: .\out\*
       env:
         CI: true
+    - uses: ncipollo/release-action@v1
+      with:
+        artifacts: "paint-by-numbers-generator-win"
+        prerelease: true
+        allowUpdates: true
+        name: "Development build"
+        tag: "latest"
+        token: ${{ secrets.GITHUB_TOKEN }}  
 
