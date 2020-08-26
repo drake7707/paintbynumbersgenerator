@@ -32,11 +32,18 @@ jobs:
       name: "Build cli to javascript"
     - run: pkg .
       name: "Package cli to single executable"
+    
+    - run:  mkdir "out"
+      name: "Create output directory"
+    - run: copy paint-by-numbers-generator-win.exe .\out\paint-by-numbers-generator-win.exe
+      name: "Copy binary to out directory"
+    - run: copy .\node_modules\canvas\build\Release\* .\out
+      name: "Copy node-canvas binaries to output"
     - uses: actions/upload-artifact@v2
       name: "Upload executable as artifact"
       with:
-        name: paint-by-numbers-generator-win.exe
-        path: paint-by-numbers-generator-win.exe
+        name: paint-by-numbers-generator-win
+        path: .\out\*
       env:
         CI: true
 
