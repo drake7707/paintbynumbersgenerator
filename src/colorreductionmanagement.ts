@@ -114,7 +114,7 @@ export class ColorReducer {
             vectors[vIdx++] = vec;
         }
 
-        const random = new Random(settings.randomSeed);
+        const random = new Random(settings.randomSeed === 0 ? new Date().getTime() : settings.randomSeed);
         // vectors of all the unique colors are built, time to cluster them
         const kmeans = new KMeans(vectors, settings.kMeansNrOfClusters, random);
 
