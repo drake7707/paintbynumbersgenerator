@@ -77,6 +77,18 @@ There are also output profiles that you can define to output the result to svg, 
 ```
 This defines 3 output profiles. The "full" profile shows labels, fills the facets and shows the borders with a 3x size multiplier, font size weight of 50, color of #333 and output to a png image. The bordersLabels profile outputs to a svg file without filling facets and jpgtest outputs to a jpg file with jpg quality setting  of 80.
 
+The CLI version also outputs a json file that gives more information about the palette, which colors are used and in what quantity, e.g.:
+```
+  ...
+  {
+    "areaPercentage": 0.20327615489130435,
+    "color": [ 59, 36, 27 ],
+    "frequency": 119689,
+    "index": 0
+  },
+   ...
+```
+
 The CLI version is useful if you want to automate the process into your own scripts.
 
 ## Screenshots
