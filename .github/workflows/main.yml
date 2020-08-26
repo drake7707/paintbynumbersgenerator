@@ -39,7 +39,7 @@ jobs:
       name: "Copy binary to out directory"
     - run: copy .\node_modules\canvas\build\Release\* .\out
       name: "Copy node-canvas binaries to output"
-    - run: del *.pdb *.ipdb *.iobj
+    - run: del *.pdb, *.ipdb, *.iobj
       name: "Cleanup unnecessary debug files"
       working-directory: ./out
     - uses: actions/upload-artifact@v2
