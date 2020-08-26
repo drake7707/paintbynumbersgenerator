@@ -45,7 +45,7 @@ jobs:
     - uses: actions/upload-artifact@v2
       name: "Upload out as artifact"
       with:
-        name: paint-by-numbers-generator-win
+        name: pbn-cli-win
         path: .\out\*
       env:
         CI: true
@@ -53,8 +53,8 @@ jobs:
     - name: Download a Build Artifact zip
       uses: actions/download-artifact@v2.0.5
       with:
-        name: "paint-by-numbers-generator-win"
-        path: "./artifacts/paint-by-numbers-generator-win.zip"
+        name: "pbn-cli-win"
+        path: "./artifacts/pbn-cli-win.zip"
     - uses: ncipollo/release-action@v1
       name: "Create development prerelease"
       with:
