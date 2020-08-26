@@ -49,13 +49,18 @@ jobs:
         path: .\out\*
       env:
         CI: true
+    - name: Download a Build Artifact zip
+      uses: actions/download-artifact@v2.0.5
+      with:
+        name: "paint-by-numbers-generator-win"
+        path: "paint-by-numbers-generator-win.zip"
     - uses: ncipollo/release-action@v1
       name: "Create development prerelease"
       with:
-        artifacts: "out/*"
+        artifacts: "paint-by-numbers-generator-win.zip"
         prerelease: true
         allowUpdates: true
-        name: "Development build"
+        name: "CLI Development build"
         tag: "latest"
         token: ${{ secrets.GITHUB_TOKEN }}  
 
