@@ -22,13 +22,18 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
     - run: npm ci
+      name: "Install dependencies from package-lock.json"
     - run: npm install pkg -g
+      name: "Install pkg"
     - run: npm install typescript -g
-    - working-directory: ./src-cli
+      name: "Install typescript"
     - run: tsc
-    - working-directory: ./
+      working-directory: ./src-cli
+      name: "Build cli to javascript"
     - run: pkg .
+      name: "Package cli to single executable"
     - uses: actions/upload-artifact@v2
+      name: "Upload executable as artifact"
       with:
         name: paint-by-numbers-generator-win.exe
         path: paint-by-numbers-generator-win.exe
