@@ -41,6 +41,7 @@ jobs:
       name: "Copy node-canvas binaries to output"
     - run: del *.pdb *.ipdb *.iobj
       name: "Cleanup unnecessary debug files"
+      working-directory: ./out
     - uses: actions/upload-artifact@v2
       name: "Upload out as artifact"
       with:
@@ -49,6 +50,7 @@ jobs:
       env:
         CI: true
     - uses: ncipollo/release-action@v1
+      name: "Create development prerelease"
       with:
         artifacts: "paint-by-numbers-generator-win"
         prerelease: true
