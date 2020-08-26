@@ -52,7 +52,7 @@ jobs:
     - uses: ncipollo/release-action@v1
       name: "Create development prerelease"
       with:
-        artifacts: "paint-by-numbers-generator-win"
+        artifacts: "out/*"
         prerelease: true
         allowUpdates: true
         name: "Development build"
