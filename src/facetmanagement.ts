@@ -87,7 +87,7 @@ export class Facet {
     public borderPoints!: Point[];
     public neighbourFacets!: number[] | null;
     /**
-     * Flag indicating if the neighbourfacets array is dirty. If it is, the neighbourfacets *have* to be rebuild
+     * Flag indicating if the neighbourfacets array is dirty. If it is, the neighbourfacets *have* to be rebuilt
      * Before it can be used. This is useful to defer the rebuilding of the array until it's actually needed
      * and can remove a lot of duplicate building of the array because multiple facets were hitting the same neighbour
      * (over 50% on test images)
@@ -115,7 +115,7 @@ export class Facet {
         let lastSegment: FacetBoundarySegment | null = null;
         for (const seg of this.borderSegments) {
 
-            // fix for the continuitity of the border segments. If transition points between border segments on the path aren't repeated, the
+            // fix for the continuity of the border segments. If transition points between border segments on the path aren't repeated, the
             // borders of the facets aren't always matching up leaving holes when rendered
             if (lastSegment != null) {
                 if (lastSegment.reverseOrder) {

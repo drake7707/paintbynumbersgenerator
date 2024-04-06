@@ -82,7 +82,7 @@ export class FacetBorderTracer {
         const count = 0;
         const path: PathPoint[] = [];
         FacetBorderTracer.addPointToPath(path, pt, xWall, f, yWall);
-        // check rotations first, then straight along the ouside and finally diagonally
+        // check rotations first, then straight along the outside and finally diagonally
         // this ensures that bends are always taken as tight as possible
         // so it doesn't skip border points to later loop back to and get stuck (hopefully)
         while (!finished) {
