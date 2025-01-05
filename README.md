@@ -1,6 +1,8 @@
 # Paint by numbers generator
 Generate paint by number images (vectorized with SVG) from any input image.
 
+*** This project was a proof of concept for fun back in the day, it is not being actively maintained but feel free to fork and make your own changes.  ***
+
 ## Demo
 
 Try it out [here](https://drake7707.github.io/paintbynumbersgenerator/index.html)
