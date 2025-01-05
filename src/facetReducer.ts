@@ -226,7 +226,7 @@ export class FacetReducer {
                     } else if (distance === minDistance) {
                         // if the distance is equal as the min distance
                         // then see if the neighbour's color is closer to the current color
-                        // note: this causes morepoints to be reallocated to different neighbours
+                        // note: this causes more points to be reallocated to different neighbours
                         // in the sanity check later, but still yields a better visual result
                         const colorDistance = colorDistances[facetToRemove.color][neighbour.color];
                         if (colorDistance < minColorDistance) {

@@ -6,7 +6,7 @@ export function fill(x: number, y: number, width: number, height: number, visite
 
     // at this point, we know array[y,x] is clear, and we want to move as far as possible to the upper-left. moving
     // up is much more important than moving left, so we could try to make this smarter by sometimes moving to
-    // the right if doing so would allow us to move further up, but it doesn't seem worth the complexit
+    // the right if doing so would allow us to move further up, but it doesn't seem worth the complexity
     let xx = x;
     let yy = y;
     while (true) {
