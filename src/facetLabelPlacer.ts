@@ -25,19 +25,42 @@ export class FacetLabelPlacer {
                 // outer path must be first ring
                 polyRings.push(borderPath);
                 const onlyOuterRing = [borderPath];
-                // now add all the neighbours of the facet as "inner" rings,
-                // regardless if they are inner or not. These are seen as areas where the label
-                // cannot be placed
+
+                // Now include all facets that are inside this facet as "inner" rings. these
+                // are seen as areas where the label cannot be placed. Due to the oddeven rule
+                // make sure only the outer facets are added (prevent holes within holes).
+
                 if (f.neighbourFacetsIsDirty) {
                     FacetCreator.buildFacetNeighbour(f, facetResult);
                 }
-                for (const neighbourIdx of f.neighbourFacets!) {
-                    const neighbourPath = facetResult.facets[neighbourIdx]!.getFullPathFromBorderSegments(true);
-                    const fallsInside: boolean = FacetLabelPlacer.doesNeighbourFallInsideInCurrentFacet(neighbourPath, f, onlyOuterRing);
-                    if (fallsInside) {
-                        polyRings.push(neighbourPath);
+
+                // First determine all facets that fall inside this facet
+                const insideFacets = facetResult.facets.filter(facet => {
+                  if(!facet || facet.id == f.id) return false;
+                  const facetPath = facet.getFullPathFromBorderSegments(true);
+                  return FacetLabelPlacer.doesNeighbourFallInsideInCurrentFacet(facetPath, f, onlyOuterRing);
+                });
+                // then only add facets that are not inside another of these facets
+                insideFacets.forEach(facet => {
+                  if(facet) {
+                    const facetPath = facet.getFullPathFromBorderSegments(true);
+                    let fallsInsideOtherInside: boolean = false;
+                    const otherInsideFacets = insideFacets.filter(otherInsideFacet => otherInsideFacet && otherInsideFacet.id != facet.id);
+                    otherInsideFacets.forEach(otherInsideFacet => {
+                      if(otherInsideFacet) {
+                        const otherInsidePath = otherInsideFacet.getFullPathFromBorderSegments(true);
+                        if(otherInsideFacet.neighbourFacetsIsDirty) FacetCreator.buildFacetNeighbour(otherInsideFacet, facetResult);
+                        if(FacetLabelPlacer.doesNeighbourFallInsideInCurrentFacet(facetPath, otherInsideFacet, [otherInsidePath])) {
+                          fallsInsideOtherInside = true;
+                        }
+                      }
+                    });
+                    if(!fallsInsideOtherInside) {
+                      polyRings.push(facetPath);
                     }
-                }
+                  }
+                });
+
                 const result = polylabel(polyRings);
                 f.labelBounds = new BoundingBox();
                 // determine inner square within the circle
@@ -59,7 +82,7 @@ export class FacetLabelPlacer {
             onUpdate(1);
         }
     }
-    
+
     /**
      *  Checks whether a neighbour border path is fully within the current facet border path
      */
